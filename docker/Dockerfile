@@ -3,16 +3,28 @@
 # Multi-stage build for a lean production image
 # Base image: Python 3.11 slim (Debian-based)
 #
-# Build:
-#   docker build -t ttg-worker:latest -f docker/Dockerfile .
+# Build with versioning:
+#   docker build -t ttg-worker:v1.1.0 -f docker/Dockerfile \
+#     --build-arg VERSION=1.1.0 \
+#     --build-arg BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+#     --build-arg GIT_COMMIT=$(git rev-parse --short HEAD) .
 #
 # Run locally (for testing):
-#   docker run -e WORKER_ID=0 -e TOTAL_WORKERS=3 -e TOTAL_PARAMETERS=1000 ttg-worker:latest
+#   docker run --name ttg-worker-test-0 \
+#     -e WORKER_ID=0 -e TOTAL_WORKERS=3 -e TOTAL_PARAMETERS=1000 \
+#     ttg-worker:v1.1.0
+
+# ============================================
+# Build arguments for versioning
+# ============================================
+ARG VERSION=1.1.0
+ARG BUILD_DATE=unknown
+ARG GIT_COMMIT=unknown
 
 # ============================================
 # Stage 1: Build stage (install dependencies)
 # ============================================
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 WORKDIR /app
 
@@ -61,7 +73,9 @@ ENV WORKER_ID=0 \
     BATCH_SIZE=100 \
     SIMULATE_WORK_MS=1 \
     SAVE_OUTPUT=false \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    LOG_LEVEL=INFO \
+    LOG_FORMAT=text
 
 # Health check (optional, useful for deployments)
 # HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
@@ -71,9 +85,23 @@ ENV WORKER_ID=0 \
 CMD ["python", "src/worker.py"]
 
 # ============================================
-# Labels for metadata
+# OCI Labels for metadata and identification
+# These help identify which containers/images
+# belong to the TTG project
 # ============================================
-LABEL maintainer="TTG Team" \
-      version="1.0.0" \
-      description="TTG Distributed Computation Worker" \
-      org.opencontainers.image.source="https://github.com/ttg/distributed-compute"
+ARG VERSION
+ARG BUILD_DATE
+ARG GIT_COMMIT
+
+LABEL org.opencontainers.image.title="TTG Distributed Worker" \
+      org.opencontainers.image.description="Distributed computation worker for the TTG project" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${GIT_COMMIT}" \
+      org.opencontainers.image.vendor="TTG Team" \
+      org.opencontainers.image.source="https://github.com/ttg/distributed-compute" \
+      org.opencontainers.image.licenses="MIT" \
+      # Custom TTG labels for easy identification
+      ttg.project="distributed-compute" \
+      ttg.component="worker" \
+      ttg.version="${VERSION}"

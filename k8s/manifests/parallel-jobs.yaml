@@ -24,9 +24,20 @@ kind: Job
 metadata:
   name: ttg-computation
   labels:
-    app: ttg
-    component: computation
-    milestone: "1"
+    # Standard labels for identification
+    app.kubernetes.io/name: ttg-worker
+    app.kubernetes.io/instance: ttg-computation
+    app.kubernetes.io/version: "1.1.0"
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/part-of: ttg-distributed-compute
+    app.kubernetes.io/managed-by: kubectl
+    # TTG custom labels
+    ttg.io/project: distributed-compute
+    ttg.io/milestone: "1"
+  annotations:
+    description: "TTG distributed computation job - processes parameters across workers"
+    ttg.io/total-parameters: "10000"
+    ttg.io/worker-count: "3"
 spec:
   # Parallel execution configuration
   completions: 3 # Total number of completions needed
@@ -42,11 +53,24 @@ spec:
   template:
     metadata:
       labels:
-        app: ttg
-        component: worker
+        # Standard labels
+        app.kubernetes.io/name: ttg-worker
+        app.kubernetes.io/instance: ttg-computation
+        app.kubernetes.io/version: "1.1.0"
+        app.kubernetes.io/component: worker
+        app.kubernetes.io/part-of: ttg-distributed-compute
+        # TTG custom labels
+        ttg.io/project: distributed-compute
+      annotations:
+        # Annotations for logging and monitoring
+        ttg.io/log-format: "text"
+        ttg.io/log-level: "INFO"
     spec:
       # Don't restart on failure (Job controller handles retries)
       restartPolicy: Never
+
+      # Termination grace period - give worker time to finish current batch
+      terminationGracePeriodSeconds: 30
 
       # Spread pods across nodes for true distribution
       # This ensures each worker runs on a different node (if possible)
@@ -57,20 +81,24 @@ spec:
               podAffinityTerm:
                 labelSelector:
                   matchExpressions:
-                    - key: job-name
+                    - key: app.kubernetes.io/name
                       operator: In
                       values:
-                        - ttg-computation
+                        - ttg-worker
                 topologyKey: kubernetes.io/hostname
 
       containers:
-        - name: worker
+        - name: ttg-worker
           # Image name - for kind, use local image
-          # For AKS, use: <acr-name>.azurecr.io/ttg-worker:latest
-          image: ttg-worker:latest
+          # For AKS, use: <acr-name>.azurecr.io/ttg-worker:v1.1.0
+          image: ttg-worker:v1.1.0
 
           # For kind, don't pull from registry (use local image)
           imagePullPolicy: IfNotPresent
+
+          # Write termination message to file (for debugging)
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: FallbackToLogsOnError
 
           # Environment variables
           env:
@@ -97,8 +125,21 @@ spec:
             - name: SIMULATE_WORK_MS
               value: "1"
 
+            # Logging configuration
+            - name: LOG_LEVEL
+              value: "INFO"
+
+            - name: LOG_FORMAT
+              value: "text"
+
             # Pod name (for logging)
             - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+
+            # Pod name explicitly
+            - name: POD_NAME
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
@@ -108,6 +149,12 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
+
+            # Namespace
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
 
           # Resource limits - IMPORTANT for not starving other apps!
           resources:
