@@ -1,0 +1,141 @@
+# TTG Parallel Jobs - Kubernetes Job Manifest
+#
+# This creates a parallel Job that distributes work across multiple workers.
+# Each worker processes a different range of parameters.
+#
+# How it works:
+#   - Creates 3 parallel pods (workers)
+#   - Each pod gets a unique JOB_COMPLETION_INDEX (0, 1, 2)
+#   - Worker uses this index as WORKER_ID to determine its parameter range
+#
+# Deploy:
+#   kubectl apply -f parallel-jobs.yaml
+#
+# Monitor:
+#   kubectl get jobs
+#   kubectl get pods -l job-name=ttg-computation
+#   kubectl logs -l job-name=ttg-computation --all-containers
+#
+# Clean up:
+#   kubectl delete -f parallel-jobs.yaml
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ttg-computation
+  labels:
+    app: ttg
+    component: computation
+    milestone: "1"
+spec:
+  # Parallel execution configuration
+  completions: 3 # Total number of completions needed
+  parallelism: 3 # How many pods can run simultaneously
+  completionMode: Indexed # Each pod gets a unique index (0, 1, 2)
+
+  # Retry policy
+  backoffLimit: 3 # Retry failed pods up to 3 times
+
+  # Clean up completed pods after 1 hour (optional)
+  ttlSecondsAfterFinished: 3600
+
+  template:
+    metadata:
+      labels:
+        app: ttg
+        component: worker
+    spec:
+      # Don't restart on failure (Job controller handles retries)
+      restartPolicy: Never
+
+      # Spread pods across nodes for true distribution
+      # This ensures each worker runs on a different node (if possible)
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: job-name
+                      operator: In
+                      values:
+                        - ttg-computation
+                topologyKey: kubernetes.io/hostname
+
+      containers:
+        - name: worker
+          # Image name - for kind, use local image
+          # For AKS, use: <acr-name>.azurecr.io/ttg-worker:latest
+          image: ttg-worker:latest
+
+          # For kind, don't pull from registry (use local image)
+          imagePullPolicy: IfNotPresent
+
+          # Environment variables
+          env:
+            # WORKER_ID comes from the Job's completion index
+            - name: WORKER_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.annotations['batch.kubernetes.io/job-completion-index']
+
+            # Total workers = completions count
+            - name: TOTAL_WORKERS
+              value: "3"
+
+            # Total parameters to process
+            - name: TOTAL_PARAMETERS
+              value: "10000"
+
+            # Batch size for progress reporting
+            - name: BATCH_SIZE
+              value: "500"
+
+            # Simulated work time per parameter (ms)
+            # Set to 1ms for quick testing, increase for realistic simulation
+            - name: SIMULATE_WORK_MS
+              value: "1"
+
+            # Pod name (for logging)
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+
+            # Node name (to verify distribution)
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+
+          # Resource limits - IMPORTANT for not starving other apps!
+          resources:
+            requests:
+              cpu: "100m" # 0.1 CPU core requested
+              memory: "128Mi" # 128 MB RAM requested
+            limits:
+              cpu: "500m" # Max 0.5 CPU core
+              memory: "256Mi" # Max 256 MB RAM
+
+          # Optional: Volume mount for saving results
+          # volumeMounts:
+          #   - name: output
+          #     mountPath: /output
+
+      # Optional: Shared volume for results
+      # volumes:
+      #   - name: output
+      #     emptyDir: {}
+
+---
+# Optional: ConfigMap for shared configuration
+# Uncomment if you want to centralize configuration
+# apiVersion: v1
+# kind: ConfigMap
+# metadata:
+#   name: ttg-config
+# data:
+#   TOTAL_PARAMETERS: "10000"
+#   BATCH_SIZE: "500"
+#   SIMULATE_WORK_MS: "1"

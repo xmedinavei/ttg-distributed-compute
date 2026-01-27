@@ -1,0 +1,72 @@
+# TTG Worker Job Template - Single Worker
+#
+# Use this for testing a single worker before scaling up.
+#
+# Deploy:
+#   kubectl apply -f worker-job.yaml
+#
+# Monitor:
+#   kubectl get pods -l app=ttg-worker-single
+#   kubectl logs -l app=ttg-worker-single
+#
+# Clean up:
+#   kubectl delete -f worker-job.yaml
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ttg-worker-single
+  labels:
+    app: ttg
+    component: worker-test
+spec:
+  # Single completion
+  completions: 1
+  parallelism: 1
+
+  # Retry policy
+  backoffLimit: 2
+
+  # Auto-cleanup after 30 minutes
+  ttlSecondsAfterFinished: 1800
+
+  template:
+    metadata:
+      labels:
+        app: ttg-worker-single
+    spec:
+      restartPolicy: Never
+
+      containers:
+        - name: worker
+          image: ttg-worker:latest
+          imagePullPolicy: IfNotPresent
+
+          env:
+            # Single worker processes everything
+            - name: WORKER_ID
+              value: "0"
+            - name: TOTAL_WORKERS
+              value: "1"
+            - name: TOTAL_PARAMETERS
+              value: "1000" # Small number for testing
+            - name: BATCH_SIZE
+              value: "100"
+            - name: SIMULATE_WORK_MS
+              value: "1"
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"

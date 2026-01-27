@@ -1,0 +1,67 @@
+# kind Configuration for TTG Sandbox
+# Creates a multi-node cluster simulating a production-like environment
+#
+# Nodes:
+#   - 1 control-plane (manages the cluster)
+#   - 3 workers (run our computation jobs)
+#
+# Usage:
+#   kind create cluster --name ttg-sandbox --config kind-config.yaml
+
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+
+# Cluster name (can also be specified via --name flag)
+name: ttg-sandbox
+
+# Node configuration
+nodes:
+  # Control plane node - the "brain" of the cluster
+  - role: control-plane
+    # Optional: Add labels for identification
+    kubeadmConfigPatches:
+      - |
+        kind: InitConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "node-type=control-plane"
+
+  # Worker node 1
+  - role: worker
+    kubeadmConfigPatches:
+      - |
+        kind: JoinConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "node-type=worker,worker-id=1"
+
+  # Worker node 2
+  - role: worker
+    kubeadmConfigPatches:
+      - |
+        kind: JoinConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "node-type=worker,worker-id=2"
+
+  # Worker node 3
+  - role: worker
+    kubeadmConfigPatches:
+      - |
+        kind: JoinConfiguration
+        nodeRegistration:
+          kubeletExtraArgs:
+            node-labels: "node-type=worker,worker-id=3"
+
+# Networking configuration
+networking:
+  # Pod subnet (default is fine for testing)
+  podSubnet: "10.244.0.0/16"
+  # Service subnet
+  serviceSubnet: "10.96.0.0/12"
+  # Disable default CNI to use kindnet (simpler)
+  disableDefaultCNI: false
+
+# Feature gates (optional - enable experimental features)
+# featureGates:
+#   "SomeFeature": true
