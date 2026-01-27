@@ -1,0 +1,105 @@
+# TTG Project - Docker Ignore
+# ============================
+# Files and directories to exclude from Docker build context
+# This speeds up builds and reduces image size
+
+# ============================================
+# Git
+# ============================================
+.git/
+.gitignore
+.gitattributes
+
+# ============================================
+# Documentation (not needed in container)
+# ============================================
+docs/
+*.md
+!README.md
+LICENSE
+
+# ============================================
+# Python Development
+# ============================================
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+
+# Testing
+tests/
+test_*.py
+*_test.py
+htmlcov/
+.coverage
+.tox/
+
+# ============================================
+# IDE / Editors
+# ============================================
+.vscode/
+.idea/
+*.sublime-*
+*.swp
+*.swo
+
+# ============================================
+# Operating System
+# ============================================
+.DS_Store
+Thumbs.db
+*~
+
+# ============================================
+# Kubernetes Manifests (not needed in image)
+# ============================================
+k8s/
+
+# ============================================
+# Scripts (build scripts not needed in image)
+# ============================================
+scripts/
+
+# ============================================
+# Project Specific
+# ============================================
+# Output directory
+output/
+results/
+
+# Log files
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Environment files
+.env
+.env.*
+*.env.local
+
+# ============================================
+# Docker (prevent recursive inclusion)
+# ============================================
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# ============================================
+# CI/CD (not needed in image)
+# ============================================
+.github/
+.gitlab-ci.yml
+.travis.yml
+Jenkinsfile
+azure-pipelines.yml
