@@ -24,8 +24,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Copy requirements first (for layer caching)
 COPY requirements.txt .
 
-# Install Python dependencies
-RUN pip install --no-cache-dir --user -r requirements.txt
+# Install Python dependencies to a known location
+RUN pip install --no-cache-dir --target=/app/deps -r requirements.txt
 
 # ============================================
 # Stage 2: Production stage (minimal image)
@@ -38,7 +38,7 @@ WORKDIR /app
 RUN useradd --create-home --shell /bin/bash worker
 
 # Copy installed packages from builder
-COPY --from=builder /root/.local /home/worker/.local
+COPY --from=builder /app/deps /home/worker/.local/lib/python3.11/site-packages
 
 # Copy application code
 COPY src/ ./src/
@@ -49,8 +49,9 @@ RUN chown -R worker:worker /app
 # Switch to non-root user
 USER worker
 
-# Add local bin to PATH
-ENV PATH=/home/worker/.local/bin:$PATH
+# Add local bin to PATH and set PYTHONPATH
+ENV PATH=/home/worker/.local/bin:$PATH \
+    PYTHONPATH=/home/worker/.local/lib/python3.11/site-packages
 
 # Environment variables with defaults
 # These can be overridden at runtime
