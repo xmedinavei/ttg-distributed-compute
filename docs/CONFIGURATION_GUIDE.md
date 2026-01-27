@@ -2,7 +2,7 @@
 
 ## For the TTG Distributed Computation Project
 
-*A guide explaining when and how to modify the number of workers, parameters, and resources for each milestone.*
+_A guide explaining when and how to modify the number of workers, parameters, and resources for each milestone._
 
 ---
 
@@ -69,11 +69,13 @@
 **Short answer: NO, not for Milestone 1.**
 
 The current configuration is designed for the first milestone:
+
 - 3 workers ✅
 - 10,000 test parameters ✅
 - Resource limits to prevent resource hogging ✅
 
 **You'll need to modify configuration when:**
+
 - Testing at larger scale (Milestone 2+)
 - Your actual algorithm has different resource needs
 - Moving to production with real 10M parameters
@@ -91,8 +93,8 @@ The current configuration is designed for the first milestone:
 completions: 3
 parallelism: 3
 TOTAL_WORKERS: "3"
-TOTAL_PARAMETERS: "10000"      # Small for fast testing
-SIMULATE_WORK_MS: "1"          # Quick simulation
+TOTAL_PARAMETERS: "10000" # Small for fast testing
+SIMULATE_WORK_MS: "1" # Quick simulation
 
 resources:
   requests:
@@ -104,11 +106,13 @@ resources:
 ```
 
 **Why these values?**
+
 - 3 workers: Proves distribution across nodes
 - 10K params: Fast testing (~10 seconds)
 - Low resources: Won't impact other apps
 
 **When to move on:**
+
 - ✅ All 3 workers complete successfully
 - ✅ Work is distributed across different nodes
 - ✅ Each worker processes its assigned range
@@ -124,7 +128,7 @@ resources:
 completions: 10
 parallelism: 10
 TOTAL_WORKERS: "10"
-TOTAL_PARAMETERS: "100000"     # 100K parameters
+TOTAL_PARAMETERS: "100000" # 100K parameters
 SIMULATE_WORK_MS: "1"
 
 resources:
@@ -132,15 +136,17 @@ resources:
     cpu: "200m"
     memory: "256Mi"
   limits:
-    cpu: "1000m"               # 1 CPU core max
+    cpu: "1000m" # 1 CPU core max
     memory: "512Mi"
 ```
 
 **Prerequisites:**
+
 - Need more nodes (at least 5-10)
 - Consider using Azure AKS for real multi-node testing
 
 **When to move on:**
+
 - ✅ All 10 workers complete successfully
 - ✅ Linear speedup observed (10x faster than 1 worker)
 - ✅ No resource contention issues
@@ -156,19 +162,20 @@ resources:
 completions: 10
 parallelism: 10
 TOTAL_WORKERS: "10"
-TOTAL_PARAMETERS: "1000000"    # 1M parameters
-SIMULATE_WORK_MS: "0"          # Disable simulation, use real algo
+TOTAL_PARAMETERS: "1000000" # 1M parameters
+SIMULATE_WORK_MS: "0" # Disable simulation, use real algo
 
 resources:
   requests:
-    cpu: "500m"                # Adjust based on profiling
-    memory: "512Mi"            # Adjust based on profiling
+    cpu: "500m" # Adjust based on profiling
+    memory: "512Mi" # Adjust based on profiling
   limits:
-    cpu: "2000m"               # 2 CPU cores max
-    memory: "2Gi"              # 2GB RAM max
+    cpu: "2000m" # 2 CPU cores max
+    memory: "2Gi" # 2GB RAM max
 ```
 
 **Requirements:**
+
 - Profile your actual algorithm first
 - Understand CPU vs memory characteristics
 - Test with subset before full scale
@@ -184,18 +191,19 @@ resources:
 completions: 100
 parallelism: 100
 TOTAL_WORKERS: "100"
-TOTAL_PARAMETERS: "10000000"   # 10M parameters
+TOTAL_PARAMETERS: "10000000" # 10M parameters
 
 resources:
   requests:
-    cpu: "1000m"               # Based on profiling
-    memory: "1Gi"              # Based on profiling
+    cpu: "1000m" # Based on profiling
+    memory: "1Gi" # Based on profiling
   limits:
-    cpu: "4000m"               # 4 CPU cores max
-    memory: "4Gi"              # 4GB RAM max
+    cpu: "4000m" # 4 CPU cores max
+    memory: "4Gi" # 4GB RAM max
 ```
 
 **Considerations:**
+
 - Need significant cluster resources
 - Consider using Azure AKS with autoscaling
 - Implement checkpointing for fault tolerance
@@ -207,13 +215,14 @@ resources:
 
 ### Worker Count Parameters
 
-| Parameter | Location | Description | Example |
-|-----------|----------|-------------|---------|
-| `completions` | Job YAML | Total number of successful completions needed | `3`, `10`, `100` |
-| `parallelism` | Job YAML | Max concurrent pods | Usually same as completions |
-| `TOTAL_WORKERS` | Env var | Tells worker code how many peers exist | Must match completions |
+| Parameter       | Location | Description                                   | Example                     |
+| --------------- | -------- | --------------------------------------------- | --------------------------- |
+| `completions`   | Job YAML | Total number of successful completions needed | `3`, `10`, `100`            |
+| `parallelism`   | Job YAML | Max concurrent pods                           | Usually same as completions |
+| `TOTAL_WORKERS` | Env var  | Tells worker code how many peers exist        | Must match completions      |
 
 **Relationship:**
+
 ```
 completions = parallelism = TOTAL_WORKERS (for our use case)
 
@@ -225,12 +234,13 @@ Work Distribution:
 
 ### Data Size Parameters
 
-| Parameter | Location | Description | Example |
-|-----------|----------|-------------|---------|
-| `TOTAL_PARAMETERS` | Env var | Total parameters to process | `10000`, `1000000`, `10000000` |
-| `BATCH_SIZE` | Env var | How often to report progress | `100`, `1000`, `10000` |
+| Parameter          | Location | Description                  | Example                        |
+| ------------------ | -------- | ---------------------------- | ------------------------------ |
+| `TOTAL_PARAMETERS` | Env var  | Total parameters to process  | `10000`, `1000000`, `10000000` |
+| `BATCH_SIZE`       | Env var  | How often to report progress | `100`, `1000`, `10000`         |
 
 **Guidelines:**
+
 ```
 BATCH_SIZE recommendation:
   - Total < 10K:   BATCH_SIZE = 100
@@ -243,14 +253,15 @@ This gives reasonable progress updates without log spam.
 
 ### Resource Parameters
 
-| Parameter | Location | Description | Example |
-|-----------|----------|-------------|---------|
-| `requests.cpu` | Job YAML | Minimum CPU guaranteed | `100m`, `500m`, `1000m` |
-| `requests.memory` | Job YAML | Minimum RAM guaranteed | `128Mi`, `512Mi`, `1Gi` |
-| `limits.cpu` | Job YAML | Maximum CPU allowed | `500m`, `2000m`, `4000m` |
-| `limits.memory` | Job YAML | Maximum RAM allowed | `256Mi`, `1Gi`, `4Gi` |
+| Parameter         | Location | Description            | Example                  |
+| ----------------- | -------- | ---------------------- | ------------------------ |
+| `requests.cpu`    | Job YAML | Minimum CPU guaranteed | `100m`, `500m`, `1000m`  |
+| `requests.memory` | Job YAML | Minimum RAM guaranteed | `128Mi`, `512Mi`, `1Gi`  |
+| `limits.cpu`      | Job YAML | Maximum CPU allowed    | `500m`, `2000m`, `4000m` |
+| `limits.memory`   | Job YAML | Maximum RAM allowed    | `256Mi`, `1Gi`, `4Gi`    |
 
 **Units:**
+
 ```
 CPU:
   100m = 0.1 CPU cores
@@ -362,6 +373,7 @@ Workers | Time (theoretical) | Actual (with overhead)
 ```
 
 **Why "actual" is higher:**
+
 - Scheduling overhead
 - Network latency
 - Resource contention
@@ -411,11 +423,11 @@ import pstats
 def profile_computation():
     profiler = cProfile.Profile()
     profiler.enable()
-    
+
     # Your computation here
     for i in range(1000):
         result = your_algorithm(i)
-    
+
     profiler.disable()
     stats = pstats.Stats(profiler)
     stats.sort_stats('cumulative')
@@ -496,11 +508,11 @@ kubectl logs -l job-name=ttg-computation --all-containers | grep "Duration:"
 Run this matrix to understand your scaling characteristics:
 
 | Workers | Parameters | Expected Time | Actual Time | Efficiency |
-|---------|------------|---------------|-------------|------------|
-| 1 | 10,000 | baseline | ___ sec | 100% |
-| 3 | 10,000 | baseline/3 | ___ sec | ___% |
-| 3 | 30,000 | baseline | ___ sec | ___% |
-| 10 | 100,000 | baseline | ___ sec | ___% |
+| ------- | ---------- | ------------- | ----------- | ---------- |
+| 1       | 10,000     | baseline      | \_\_\_ sec  | 100%       |
+| 3       | 10,000     | baseline/3    | \_\_\_ sec  | \_\_\_%    |
+| 3       | 30,000     | baseline      | \_\_\_ sec  | \_\_\_%    |
+| 10      | 100,000    | baseline      | \_\_\_ sec  | \_\_\_%    |
 
 ---
 
@@ -516,7 +528,7 @@ env:
   - name: TOTAL_PARAMETERS
     value: "1000"
   - name: SIMULATE_WORK_MS
-    value: "0"  # No delay
+    value: "0" # No delay
 resources:
   limits:
     cpu: "100m"
@@ -533,7 +545,7 @@ env:
   - name: TOTAL_PARAMETERS
     value: "10000"
   - name: SIMULATE_WORK_MS
-    value: "10"  # 10ms per param = ~33 sec per worker
+    value: "10" # 10ms per param = ~33 sec per worker
 resources:
   limits:
     cpu: "500m"
@@ -569,9 +581,9 @@ env:
   - name: BATCH_SIZE
     value: "100000"
   - name: SIMULATE_WORK_MS
-    value: "0"  # Use real algorithm
+    value: "0" # Use real algorithm
   - name: SAVE_OUTPUT
-    value: "true"  # Save results
+    value: "true" # Save results
 resources:
   requests:
     cpu: "1000m"
@@ -585,12 +597,12 @@ resources:
 
 ## Summary: When to Change What
 
-| Milestone | Workers | Parameters | Resources | Notes |
-|-----------|---------|------------|-----------|-------|
-| 1 (Setup) | 3 | 10K | Low | **Current - don't change** |
-| 2 (Scale) | 10-50 | 100K-1M | Medium | After M1 validated |
-| 3 (Integration) | 10-50 | Based on algo | **Profile first** | After real algo integrated |
-| 4 (Production) | 50-1000 | 10M | Based on profiling | After all testing complete |
+| Milestone       | Workers | Parameters    | Resources          | Notes                      |
+| --------------- | ------- | ------------- | ------------------ | -------------------------- |
+| 1 (Setup)       | 3       | 10K           | Low                | **Current - don't change** |
+| 2 (Scale)       | 10-50   | 100K-1M       | Medium             | After M1 validated         |
+| 3 (Integration) | 10-50   | Based on algo | **Profile first**  | After real algo integrated |
+| 4 (Production)  | 50-1000 | 10M           | Based on profiling | After all testing complete |
 
 ### Golden Rule
 
@@ -604,5 +616,5 @@ Don't optimize prematurely!
 
 ---
 
-*Last Updated: 2026-01-26*
-*Document: CONFIGURATION_GUIDE.md*
+_Last Updated: 2026-01-26_
+_Document: CONFIGURATION_GUIDE.md_

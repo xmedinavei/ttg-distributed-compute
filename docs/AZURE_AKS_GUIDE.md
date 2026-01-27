@@ -2,7 +2,7 @@
 
 ## For the TTG Distributed Computation Project
 
-*A comprehensive guide to deploying on Azure Kubernetes Service (AKS) with pros/cons analysis, cost breakdown, and step-by-step instructions.*
+_A comprehensive guide to deploying on Azure Kubernetes Service (AKS) with pros/cons analysis, cost breakdown, and step-by-step instructions._
 
 ---
 
@@ -28,6 +28,7 @@
 ### What is Azure AKS?
 
 **Azure Kubernetes Service (AKS)** is Microsoft's managed Kubernetes offering. Azure handles:
+
 - Control plane management (free!)
 - Automatic upgrades
 - Security patches
@@ -36,13 +37,13 @@
 
 ### Quick Decision Matrix
 
-| Factor | Local (kind) | Azure AKS |
-|--------|--------------|-----------|
-| **Cost** | Free | ~$0.05-0.10/hour per node |
-| **Setup Time** | 5 min | 15-20 min |
-| **Scalability** | Limited by local machine | Virtually unlimited |
-| **Production-like** | No | Yes |
-| **Best For** | Learning, testing, dev | Staging, production |
+| Factor              | Local (kind)             | Azure AKS                 |
+| ------------------- | ------------------------ | ------------------------- |
+| **Cost**            | Free                     | ~$0.05-0.10/hour per node |
+| **Setup Time**      | 5 min                    | 15-20 min                 |
+| **Scalability**     | Limited by local machine | Virtually unlimited       |
+| **Production-like** | No                       | Yes                       |
+| **Best For**        | Learning, testing, dev   | Staging, production       |
 
 ### Recommendation
 
@@ -65,26 +66,26 @@ PRODUCTION:
 
 #### Local (kind)
 
-| Pros ✅ | Cons ❌ |
-|---------|---------|
-| **Free** - No cloud costs | **Limited resources** - Constrained by local machine |
-| **Fast setup** - 2-5 minutes | **Not production-like** - Single machine simulation |
-| **Works offline** - No internet needed | **No real network latency** - All local |
+| Pros ✅                                       | Cons ❌                                                  |
+| --------------------------------------------- | -------------------------------------------------------- |
+| **Free** - No cloud costs                     | **Limited resources** - Constrained by local machine     |
+| **Fast setup** - 2-5 minutes                  | **Not production-like** - Single machine simulation      |
+| **Works offline** - No internet needed        | **No real network latency** - All local                  |
 | **Great for learning** - Safe experimentation | **Can't test true scaling** - Limited to local resources |
-| **Easy reset** - Delete and recreate quickly | **No cloud integrations** - No Azure services |
-| **CI/CD friendly** - Easy to automate | **Difficult to share** - Only on your machine |
+| **Easy reset** - Delete and recreate quickly  | **No cloud integrations** - No Azure services            |
+| **CI/CD friendly** - Easy to automate         | **Difficult to share** - Only on your machine            |
 
 #### Azure AKS
 
-| Pros ✅ | Cons ❌ |
-|---------|---------|
-| **Production-like** - Real multi-node cluster | **Costs money** - Pay for compute resources |
-| **Scalable** - Add nodes as needed | **Longer setup** - 15-20 minutes |
+| Pros ✅                                          | Cons ❌                                        |
+| ------------------------------------------------ | ---------------------------------------------- |
+| **Production-like** - Real multi-node cluster    | **Costs money** - Pay for compute resources    |
+| **Scalable** - Add nodes as needed               | **Longer setup** - 15-20 minutes               |
 | **Real networking** - True latency and bandwidth | **Requires Azure account** - Need subscription |
-| **Azure integrations** - ACR, Monitor, KeyVault | **Internet required** - Cloud dependency |
-| **Managed control plane** - Azure handles it | **More complex** - More moving parts |
-| **Team access** - Share with colleagues | **Cleanup required** - Remember to delete |
-| **Auto-scaling** - Scale on demand | **Learning curve** - More configuration |
+| **Azure integrations** - ACR, Monitor, KeyVault  | **Internet required** - Cloud dependency       |
+| **Managed control plane** - Azure handles it     | **More complex** - More moving parts           |
+| **Team access** - Share with colleagues          | **Cleanup required** - Remember to delete      |
+| **Auto-scaling** - Scale on demand               | **Learning curve** - More configuration        |
 
 ### Feature Comparison
 
@@ -157,17 +158,17 @@ PRODUCTION:
 
 ### Specific Scenarios
 
-| Scenario | Recommendation | Reason |
-|----------|---------------|--------|
-| Learning K8s concepts | Local (kind) | Free, fast, safe |
-| First milestone (3 workers) | Local (kind) | Sufficient for validation |
-| Testing 50+ workers | Azure AKS | Need real multi-node |
-| Team collaboration | Azure AKS | Shared access |
-| CI/CD pipeline | Either | Both work well |
-| Production deployment | Azure AKS | Production-ready |
-| Demo to stakeholders | Azure AKS | Real environment |
-| Budget: $0 | Local (kind) | Free |
-| Quick iteration | Local (kind) | Faster feedback |
+| Scenario                    | Recommendation | Reason                    |
+| --------------------------- | -------------- | ------------------------- |
+| Learning K8s concepts       | Local (kind)   | Free, fast, safe          |
+| First milestone (3 workers) | Local (kind)   | Sufficient for validation |
+| Testing 50+ workers         | Azure AKS      | Need real multi-node      |
+| Team collaboration          | Azure AKS      | Shared access             |
+| CI/CD pipeline              | Either         | Both work well            |
+| Production deployment       | Azure AKS      | Production-ready          |
+| Demo to stakeholders        | Azure AKS      | Real environment          |
+| Budget: $0                  | Local (kind)   | Free                      |
+| Quick iteration             | Local (kind)   | Faster feedback           |
 
 ---
 
@@ -212,20 +213,21 @@ PRODUCTION:
 
 ### VM Size Options for TTG Project
 
-| VM Size | vCPUs | RAM | Cost/hour* | Best For |
-|---------|-------|-----|------------|----------|
-| **Standard_B2s** | 2 | 4 GB | ~$0.05 | Testing (cheapest) |
-| **Standard_B2ms** | 2 | 8 GB | ~$0.08 | Light workloads |
-| **Standard_D2s_v3** | 2 | 8 GB | ~$0.10 | General purpose |
-| **Standard_D4s_v3** | 4 | 16 GB | ~$0.19 | Heavier workloads |
-| **Standard_D8s_v3** | 8 | 32 GB | ~$0.38 | Compute-intensive |
-| **Standard_F4s_v2** | 4 | 8 GB | ~$0.17 | CPU-optimized |
+| VM Size             | vCPUs | RAM   | Cost/hour\* | Best For           |
+| ------------------- | ----- | ----- | ----------- | ------------------ |
+| **Standard_B2s**    | 2     | 4 GB  | ~$0.05      | Testing (cheapest) |
+| **Standard_B2ms**   | 2     | 8 GB  | ~$0.08      | Light workloads    |
+| **Standard_D2s_v3** | 2     | 8 GB  | ~$0.10      | General purpose    |
+| **Standard_D4s_v3** | 4     | 16 GB | ~$0.19      | Heavier workloads  |
+| **Standard_D8s_v3** | 8     | 32 GB | ~$0.38      | Compute-intensive  |
+| **Standard_F4s_v2** | 4     | 8 GB  | ~$0.17      | CPU-optimized      |
 
-*Prices are approximate and vary by region. Check [Azure Pricing Calculator](https://azure.microsoft.com/pricing/calculator/).
+\*Prices are approximate and vary by region. Check [Azure Pricing Calculator](https://azure.microsoft.com/pricing/calculator/).
 
 ### Cost Scenarios for TTG Project
 
 #### Scenario 1: Testing (First Milestone)
+
 ```
 Configuration:
   - 3 nodes × Standard_B2s
@@ -242,6 +244,7 @@ If running 8 hours for testing:
 ```
 
 #### Scenario 2: Scale Testing (50 workers)
+
 ```
 Configuration:
   - 10 nodes × Standard_D4s_v3
@@ -259,6 +262,7 @@ If running for 4 hours of testing:
 ```
 
 #### Scenario 3: Full Scale (1000 workers)
+
 ```
 Configuration:
   - 100 nodes × Standard_D8s_v3
@@ -689,12 +693,14 @@ az acr repository delete \
 ### Common Issues
 
 #### Issue: "az: command not found"
+
 ```bash
 # Install Azure CLI
 curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
 ```
 
 #### Issue: "Not authorized" / Permission denied
+
 ```bash
 # Re-login
 az logout
@@ -705,6 +711,7 @@ az account show
 ```
 
 #### Issue: Cluster creation fails
+
 ```bash
 # Check quotas
 az vm list-usage --location eastus --output table
@@ -714,6 +721,7 @@ az aks create ... --location westus2
 ```
 
 #### Issue: Can't pull images from ACR
+
 ```bash
 # Re-attach ACR
 az aks update \
@@ -729,6 +737,7 @@ az aks check-acr \
 ```
 
 #### Issue: Pods stuck in Pending
+
 ```bash
 # Check events
 kubectl describe pod <pod-name>
@@ -805,5 +814,5 @@ Week 4+: Azure AKS (production)
 
 ---
 
-*Last Updated: 2026-01-26*
-*Document: AZURE_AKS_GUIDE.md*
+_Last Updated: 2026-01-26_
+_Document: AZURE_AKS_GUIDE.md_

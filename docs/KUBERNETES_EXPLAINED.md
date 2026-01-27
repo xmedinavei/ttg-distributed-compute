@@ -2,7 +2,7 @@
 
 ## For the TTG Distributed Computation Project
 
-*This guide explains Kubernetes concepts from the ground up, specifically in the context of solving the distributed computation problem.*
+_This guide explains Kubernetes concepts from the ground up, specifically in the context of solving the distributed computation problem._
 
 ---
 
@@ -61,6 +61,7 @@ YOUR PROBLEM:
 ### The Challenge
 
 But managing 1000 chefs is hard:
+
 - Who assigns work to each chef?
 - What if a chef gets sick (crashes)?
 - What if we need more chefs during rush hour?
@@ -85,13 +86,13 @@ But managing 1000 chefs is hard:
 
 Think of Kubernetes as the **factory manager** who:
 
-| Task | Without K8s (Manual) | With K8s (Automatic) |
-|------|---------------------|---------------------|
-| **Assign work** | You tell each worker what to do | K8s schedules work automatically |
-| **Handle failures** | You notice and restart manually | K8s detects and restarts automatically |
-| **Scale up/down** | You hire/fire workers | K8s adds/removes containers |
-| **Balance load** | You manage workload distribution | K8s distributes work evenly |
-| **Resource management** | You track who uses what | K8s enforces limits |
+| Task                    | Without K8s (Manual)             | With K8s (Automatic)                   |
+| ----------------------- | -------------------------------- | -------------------------------------- |
+| **Assign work**         | You tell each worker what to do  | K8s schedules work automatically       |
+| **Handle failures**     | You notice and restart manually  | K8s detects and restarts automatically |
+| **Scale up/down**       | You hire/fire workers            | K8s adds/removes containers            |
+| **Balance load**        | You manage workload distribution | K8s distributes work evenly            |
+| **Resource management** | You track who uses what          | K8s enforces limits                    |
 
 ### Before and After Kubernetes
 
@@ -191,13 +192,13 @@ CONTAINER:
 
 For our distributed computation:
 
-| Aspect | Without Containers | With Containers |
-|--------|-------------------|-----------------|
-| **Dependency hell** | "Works on my machine" | Same image everywhere |
-| **Deployment** | Install Python, libs, configure | `docker run worker` |
-| **Isolation** | Workers might interfere | Each worker is isolated |
-| **Scaling** | Install on each new server | Same image, just run more |
-| **Consistency** | Dev ≠ Staging ≠ Production | Identical everywhere |
+| Aspect              | Without Containers              | With Containers           |
+| ------------------- | ------------------------------- | ------------------------- |
+| **Dependency hell** | "Works on my machine"           | Same image everywhere     |
+| **Deployment**      | Install Python, libs, configure | `docker run worker`       |
+| **Isolation**       | Workers might interfere         | Each worker is isolated   |
+| **Scaling**         | Install on each new server      | Same image, just run more |
+| **Consistency**     | Dev ≠ Staging ≠ Production      | Identical everywhere      |
 
 ---
 
@@ -250,20 +251,20 @@ For our distributed computation:
 
 #### Control Plane Components
 
-| Component | Role | Pizza Factory Analogy |
-|-----------|------|----------------------|
-| **API Server** | Entry point for all commands | Reception desk - all orders come here |
-| **Scheduler** | Decides which node runs which pod | Manager who assigns chefs to stations |
+| Component              | Role                                | Pizza Factory Analogy                                |
+| ---------------------- | ----------------------------------- | ---------------------------------------------------- |
+| **API Server**         | Entry point for all commands        | Reception desk - all orders come here                |
+| **Scheduler**          | Decides which node runs which pod   | Manager who assigns chefs to stations                |
 | **Controller Manager** | Ensures desired state is maintained | Quality control - ensures 3 chefs are always working |
-| **etcd** | Stores all cluster data | Filing cabinet with all records |
+| **etcd**               | Stores all cluster data             | Filing cabinet with all records                      |
 
 #### Worker Node Components
 
-| Component | Role | Pizza Factory Analogy |
-|-----------|------|----------------------|
-| **kubelet** | Agent on each node, manages pods | Supervisor at each station |
-| **Container Runtime** | Runs containers (Docker) | The actual kitchen equipment |
-| **kube-proxy** | Handles networking | Internal phone system |
+| Component             | Role                             | Pizza Factory Analogy        |
+| --------------------- | -------------------------------- | ---------------------------- |
+| **kubelet**           | Agent on each node, manages pods | Supervisor at each station   |
+| **Container Runtime** | Runs containers (Docker)         | The actual kitchen equipment |
+| **kube-proxy**        | Handles networking               | Internal phone system        |
 
 ---
 
@@ -274,6 +275,7 @@ For our distributed computation:
 **The smallest deployable unit in Kubernetes.**
 
 A Pod is a wrapper around one or more containers that:
+
 - Share the same network namespace (same IP)
 - Share storage volumes
 - Are scheduled together on the same node
@@ -295,11 +297,13 @@ A Pod is a wrapper around one or more containers that:
 ```
 
 **For Our Project:**
+
 - Each worker runs in its own Pod
 - Pod gets environment variables (WORKER_ID, TOTAL_PARAMETERS)
 - Pod is scheduled to a Node by the Scheduler
 
 **YAML Example:**
+
 ```yaml
 apiVersion: v1
 kind: Pod
@@ -344,10 +348,12 @@ spec:
 ```
 
 **Types of Nodes:**
+
 - **Control Plane Node**: Runs the brain components (API server, scheduler, etc.)
 - **Worker Node**: Runs your application pods
 
 **For Our Project:**
+
 - We have 3 worker nodes
 - Each runs one of our computation workers
 - Scheduler distributes pods across nodes for parallel processing
@@ -359,6 +365,7 @@ spec:
 **Creates Pods that run to completion.**
 
 Unlike Deployments (which keep pods running forever), Jobs are for **batch workloads**:
+
 - Run once, then finish
 - Can run in parallel
 - Track successful completions
@@ -381,20 +388,22 @@ Unlike Deployments (which keep pods running forever), Jobs are for **batch workl
 ```
 
 **For Our Project:**
+
 - We use an **Indexed Job** where each pod gets a unique index (0, 1, 2)
 - This index becomes the WORKER_ID
 - Each worker processes parameters: `start = index * (total / workers)`
 
 **YAML Example:**
+
 ```yaml
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: ttg-computation
 spec:
-  completions: 3        # Total completions needed
-  parallelism: 3        # Run in parallel
-  completionMode: Indexed  # Each pod gets unique index
+  completions: 3 # Total completions needed
+  parallelism: 3 # Run in parallel
+  completionMode: Indexed # Each pod gets unique index
   template:
     spec:
       containers:
@@ -414,6 +423,7 @@ spec:
 **Manages long-running applications.**
 
 Deployments ensure a specified number of pod replicas are always running:
+
 - If a pod crashes, Deployment creates a new one
 - Supports rolling updates
 - Supports rollbacks
@@ -438,6 +448,7 @@ Deployments ensure a specified number of pod replicas are always running:
 ```
 
 **For Our Project:**
+
 - We use **Jobs** (not Deployments) because our workers run to completion
 - In future phases, we might use Deployments for:
   - Long-running queue workers
@@ -451,6 +462,7 @@ Deployments ensure a specified number of pod replicas are always running:
 **Provides stable networking for Pods.**
 
 Pods have ephemeral IPs (change when pod restarts). Services provide:
+
 - Stable IP/DNS name
 - Load balancing across pods
 - Service discovery
@@ -472,6 +484,7 @@ Pods have ephemeral IPs (change when pod restarts). Services provide:
 ```
 
 **For Our Project:**
+
 - First milestone doesn't need Services (workers don't talk to each other)
 - Future: Services for queue workers to connect to message broker
 
@@ -491,6 +504,7 @@ ConfigMap (non-sensitive):                Secret (sensitive):
 ```
 
 **For Our Project:**
+
 - ConfigMaps store: TOTAL_PARAMETERS, BATCH_SIZE, SIMULATE_WORK_MS
 - Secrets would store: API keys, database passwords (when needed)
 
@@ -501,6 +515,7 @@ ConfigMap (non-sensitive):                Secret (sensitive):
 **Virtual cluster within a cluster.**
 
 Namespaces provide:
+
 - Logical separation of resources
 - Access control boundaries
 - Resource quota boundaries
@@ -523,6 +538,7 @@ Namespaces provide:
 ```
 
 **For Our Project:**
+
 - We use `default` namespace for simplicity
 - Production might use separate namespaces for isolation
 
@@ -534,11 +550,11 @@ Namespaces provide:
 
 ```yaml
 resources:
-  requests:      # Minimum guaranteed resources
-    cpu: "100m"  # 0.1 CPU cores
+  requests: # Minimum guaranteed resources
+    cpu: "100m" # 0.1 CPU cores
     memory: "128Mi"
-  limits:        # Maximum allowed resources
-    cpu: "500m"  # 0.5 CPU cores
+  limits: # Maximum allowed resources
+    cpu: "500m" # 0.5 CPU cores
     memory: "256Mi"
 ```
 
@@ -816,27 +832,27 @@ Best for: Coordination-heavy workloads
 
 ## Glossary
 
-| Term | Definition |
-|------|------------|
-| **Cluster** | A set of machines (nodes) running Kubernetes |
-| **Node** | A single machine in the cluster |
-| **Pod** | Smallest deployable unit; wrapper for containers |
-| **Container** | Isolated process running your application |
-| **Job** | Creates pods that run to completion |
-| **Deployment** | Manages long-running pods with auto-healing |
-| **Service** | Stable network endpoint for pods |
-| **ConfigMap** | Stores non-sensitive configuration |
-| **Secret** | Stores sensitive configuration (encrypted) |
-| **Namespace** | Virtual cluster for resource isolation |
-| **kubelet** | Agent on each node that manages pods |
-| **kubectl** | CLI tool to interact with Kubernetes |
-| **API Server** | Entry point for all cluster commands |
-| **Scheduler** | Assigns pods to nodes |
-| **etcd** | Distributed key-value store for cluster state |
-| **Control Plane** | Components that manage the cluster |
-| **Resource Request** | Minimum resources guaranteed for a pod |
-| **Resource Limit** | Maximum resources allowed for a pod |
-| **Affinity** | Rules for pod placement preferences |
+| Term                 | Definition                                       |
+| -------------------- | ------------------------------------------------ |
+| **Cluster**          | A set of machines (nodes) running Kubernetes     |
+| **Node**             | A single machine in the cluster                  |
+| **Pod**              | Smallest deployable unit; wrapper for containers |
+| **Container**        | Isolated process running your application        |
+| **Job**              | Creates pods that run to completion              |
+| **Deployment**       | Manages long-running pods with auto-healing      |
+| **Service**          | Stable network endpoint for pods                 |
+| **ConfigMap**        | Stores non-sensitive configuration               |
+| **Secret**           | Stores sensitive configuration (encrypted)       |
+| **Namespace**        | Virtual cluster for resource isolation           |
+| **kubelet**          | Agent on each node that manages pods             |
+| **kubectl**          | CLI tool to interact with Kubernetes             |
+| **API Server**       | Entry point for all cluster commands             |
+| **Scheduler**        | Assigns pods to nodes                            |
+| **etcd**             | Distributed key-value store for cluster state    |
+| **Control Plane**    | Components that manage the cluster               |
+| **Resource Request** | Minimum resources guaranteed for a pod           |
+| **Resource Limit**   | Maximum resources allowed for a pod              |
+| **Affinity**         | Rules for pod placement preferences              |
 
 ---
 
@@ -851,5 +867,5 @@ Now that you understand the concepts:
 
 ---
 
-*Last Updated: 2026-01-26*
-*Document: KUBERNETES_EXPLAINED.md*
+_Last Updated: 2026-01-26_
+_Document: KUBERNETES_EXPLAINED.md_
