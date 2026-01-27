@@ -74,7 +74,39 @@ kubectl logs -l app.kubernetes.io/name=ttg-worker -f
 
 ---
 
-## 📖 Documentation
+## � Quick Reference
+
+Copy-paste commands for daily use:
+
+```bash
+# ══════════════════════════════════════════════════════════════
+# BUILD & DEPLOY
+# ══════════════════════════════════════════════════════════════
+./scripts/build.sh --version 1.1.0 --load-kind    # Build image
+kubectl apply -f k8s/manifests/parallel-jobs.yaml # Deploy workers
+
+# ══════════════════════════════════════════════════════════════
+# MONITOR & LOGS
+# ══════════════════════════════════════════════════════════════
+kubectl get pods -l app.kubernetes.io/name=ttg-worker -w      # Watch pods
+kubectl get pods -o wide                                       # See node placement
+kubectl logs -l app.kubernetes.io/name=ttg-worker -f          # Stream all logs
+kubectl logs <pod-name>                                        # Single pod logs
+kubectl get job ttg-computation                                # Job status
+
+# ══════════════════════════════════════════════════════════════
+# RESOURCES & CLEANUP
+# ══════════════════════════════════════════════════════════════
+./scripts/list-resources.sh                       # View all TTG resources
+./scripts/cleanup-all.sh --dry-run                # Preview cleanup
+./scripts/cleanup-all.sh --keep-cluster           # Delete job, keep cluster
+./scripts/cleanup-all.sh --force                  # Delete everything
+kubectl delete job ttg-computation                # Quick job reset
+```
+
+---
+
+## �📖 Documentation
 
 | Document                                                     | Description                               |
 | ------------------------------------------------------------ | ----------------------------------------- |
