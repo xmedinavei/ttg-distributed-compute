@@ -1,10 +1,13 @@
 # TTG - Distributed Computation on Kubernetes
 
-[![Status](https://img.shields.io/badge/status-development-yellow.svg)]()
+[![Status](https://img.shields.io/badge/status-milestone_1_complete-green.svg)]()
+[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)]()
 [![Kubernetes](https://img.shields.io/badge/kubernetes-1.27+-blue.svg)]()
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)]()
 
 A framework for running distributed computation workloads across a Kubernetes cluster. Designed to accelerate parameter-heavy algorithms by distributing work across multiple worker nodes.
+
+> **📊 Latest Test:** 10,000 parameters processed across 3 workers in ~10 seconds
 
 ## 🚀 Quick Start (5 minutes)
 
@@ -17,59 +20,71 @@ A framework for running distributed computation workloads across a Kubernetes cl
 ### 1. Create the Cluster
 
 ```bash
-# Clone/navigate to project
 cd /home/xavierand_/Desktop/TTG
 
 # Create local Kubernetes cluster with 3 worker nodes
-chmod +x k8s/local/setup-local.sh
 ./k8s/local/setup-local.sh
 ```
 
 ### 2. Build the Worker Image
 
 ```bash
-chmod +x scripts/build.sh
-./scripts/build.sh
+# Build with version and load into kind cluster
+./scripts/build.sh --version 1.1.0 --load-kind
 ```
 
 ### 3. Deploy Workers
 
 ```bash
-chmod +x scripts/deploy.sh
-./scripts/deploy.sh
+kubectl apply -f k8s/manifests/parallel-jobs.yaml
 ```
 
 ### 4. Watch the Magic! ✨
 
 ```bash
 # Watch pods being created and running
-kubectl get pods -l job-name=ttg-computation -w
+kubectl get pods -l app.kubernetes.io/name=ttg-worker -w
 
 # See which node each pod runs on
-kubectl get pods -l job-name=ttg-computation -o wide
+kubectl get pods -l app.kubernetes.io/name=ttg-worker -o wide
 
-# View logs from all workers
-kubectl logs -l job-name=ttg-computation --all-containers -f
+# View logs from all workers (with enhanced logging)
+kubectl logs -l app.kubernetes.io/name=ttg-worker -f
 ```
 
-### 5. Clean Up
+### 5. View Resources
 
 ```bash
-chmod +x scripts/cleanup.sh
-./scripts/cleanup.sh
+# See all TTG resources (Docker + Kubernetes)
+./scripts/list-resources.sh
+```
 
-# To delete the entire cluster:
-./scripts/cleanup.sh --all
+### 6. Clean Up
+
+```bash
+# Preview what will be deleted
+./scripts/cleanup-all.sh --dry-run
+
+# Delete job only (keep cluster for next run)
+./scripts/cleanup-all.sh --keep-cluster
+
+# Delete everything including cluster
+./scripts/cleanup-all.sh --force
 ```
 
 ---
 
 ## 📖 Documentation
 
-| Document                                             | Description                                          |
-| ---------------------------------------------------- | ---------------------------------------------------- |
-| [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md) | Full project explanation, K8s concepts, architecture |
-| [docs/KUBERNETES_SETUP.md](docs/KUBERNETES_SETUP.md) | Detailed setup instructions (local & Azure)          |
+| Document                                                     | Description                               |
+| ------------------------------------------------------------ | ----------------------------------------- |
+| [SUPERVISOR_REPORT.md](SUPERVISOR_REPORT.md)                 | **Executive summary & quick start guide** |
+| [docs/KIND_EXPLAINED.md](docs/KIND_EXPLAINED.md)             | Kind tutorial for Kubernetes beginners    |
+| [docs/KUBERNETES_EXPLAINED.md](docs/KUBERNETES_EXPLAINED.md) | K8s concepts explained                    |
+| [docs/CONFIGURATION_GUIDE.md](docs/CONFIGURATION_GUIDE.md)   | Configuration reference                   |
+| [docs/TEST_RESULTS_v1.1.0.md](docs/TEST_RESULTS_v1.1.0.md)   | Detailed v1.1.0 test results              |
+| [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md)         | Project background & architecture         |
+| [docs/KUBERNETES_SETUP.md](docs/KUBERNETES_SETUP.md)         | Setup instructions (local & Azure)        |
 
 ---
 
@@ -77,30 +92,33 @@ chmod +x scripts/cleanup.sh
 
 ```
 TTG/
-├── docs/                     # Documentation
-│   ├── PROJECT_OVERVIEW.md   # Problem explanation & architecture
-│   └── KUBERNETES_SETUP.md   # Setup instructions
+├── src/                          # Source code
+│   ├── worker.py                 # Main distributed worker (v1.1.0)
+│   └── logging_config.py         # Structured logging infrastructure
+│
 ├── docker/
-│   └── Dockerfile            # Worker container definition
-├── src/
-│   ├── worker.py             # Main computation worker
-│   └── utils.py              # Utility functions
+│   └── Dockerfile                # Multi-stage build with OCI labels
+│
 ├── k8s/
+│   ├── manifests/
+│   │   └── parallel-jobs.yaml    # Main deployment manifest
 │   ├── local/
-│   │   ├── kind-config.yaml  # 3-node cluster config
-│   │   └── setup-local.sh    # Local setup script
-│   ├── azure/
-│   │   └── setup-aks.sh      # Azure AKS setup script
-│   └── manifests/
-│       ├── parallel-jobs.yaml # Parallel worker jobs
-│       └── worker-job.yaml    # Single worker job
+│   │   ├── kind-config.yaml      # Kind cluster configuration
+│   │   └── setup-local.sh        # Cluster setup script
+│   └── azure/
+│       └── setup-aks.sh          # Azure AKS setup (future)
+│
 ├── scripts/
-│   ├── build.sh              # Build Docker image
-│   ├── deploy.sh             # Deploy to Kubernetes
-│   ├── cleanup.sh            # Clean up resources
-│   └── run-local.sh          # Run worker locally
-├── requirements.txt          # Python dependencies
-└── README.md                 # This file
+│   ├── build.sh                  # Versioned image building
+│   ├── list-resources.sh         # Resource inventory
+│   ├── cleanup-all.sh            # Comprehensive cleanup
+│   ├── deploy.sh                 # Deployment helper
+│   └── run-local.sh              # Local testing
+│
+├── docs/                         # Documentation
+├── SUPERVISOR_REPORT.md          # Executive summary
+├── requirements.txt              # Python dependencies
+└── README.md                     # This file
 ```
 
 ---
@@ -151,8 +169,10 @@ Each worker runs in a container on a different node, processing in parallel.
 | `WORKER_ID`        | 0       | Unique worker identifier          |
 | `TOTAL_WORKERS`    | 3       | Total number of workers           |
 | `TOTAL_PARAMETERS` | 10000   | Total parameters to process       |
-| `BATCH_SIZE`       | 100     | Parameters per progress update    |
+| `BATCH_SIZE`       | 500     | Parameters per progress update    |
 | `SIMULATE_WORK_MS` | 1       | Simulated work time per parameter |
+| `LOG_LEVEL`        | INFO    | DEBUG, INFO, WARNING, ERROR       |
+| `LOG_FORMAT`       | text    | text (human) or json (machine)    |
 
 ### Kubernetes Resources
 
@@ -278,4 +298,4 @@ MIT License - See LICENSE file for details.
 
 ---
 
-_Created: 2026-01-26 | First Milestone: Kubernetes Sandbox Setup_
+_Last Updated: 2026-01-27 | Version: 1.1.0 | Milestone 1: ✅ Complete_
