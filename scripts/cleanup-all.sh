@@ -148,6 +148,16 @@ if [ "$DRY_RUN" = true ]; then
     echo -e "${YELLOW}DRY-RUN MODE: No changes will be made${NC}"
 fi
 
+echo ""
+echo -e "${BOLD}${GREEN}SAFETY NOTE:${NC} This script ONLY deletes TTG project resources:"
+echo -e "  • Kubernetes: jobs/pods with label ${BOLD}app.kubernetes.io/name=ttg-worker${NC}"
+echo -e "  • Kind cluster: ${BOLD}${KIND_CLUSTER_NAME}${NC} only"
+echo -e "  • Docker containers: names starting with ${BOLD}${PROJECT_PREFIX}-${NC}"
+echo -e "  • Docker images: ${BOLD}${IMAGE_NAME}:*${NC} only"
+echo -e "  • Docker volumes/networks: names starting with ${BOLD}${PROJECT_PREFIX}-${NC}"
+echo ""
+echo -e "${YELLOW}Other Docker resources will NOT be affected.${NC}"
+echo ""
 # ─────────────────────────────────────────────────────────────────────────────
 # Step 1: Kubernetes Resources
 # ─────────────────────────────────────────────────────────────────────────────
@@ -318,17 +328,23 @@ else
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Step 7: Docker System Prune (optional)
+# Step 7: Summary of Deleted Resources
 # ─────────────────────────────────────────────────────────────────────────────
 
-print_step "Step 7: Docker System Cleanup (Optional)"
+print_step "Step 7: Cleanup Summary"
 
-if [ "$DRY_RUN" = false ] && confirm "Run docker system prune to clean dangling resources?"; then
-    execute "docker system prune -f" "Prune dangling resources"
-    print_success "Docker system pruned"
-else
-    print_info "Skipped docker system prune"
-fi
+# NOTE: We intentionally do NOT run "docker system prune" here.
+# That command deletes ALL unused Docker resources system-wide,
+# not just TTG resources. Running it could delete containers,
+# images, and volumes from other projects.
+#
+# If you want to prune Docker system-wide, run manually:
+#   docker system prune -f
+#
+# But be aware this affects ALL projects, not just TTG.
+
+print_info "Only TTG-specific resources were targeted for deletion."
+print_info "Other Docker containers and images were NOT affected."
 
 # ═══════════════════════════════════════════════════════════════════════════
 # SUMMARY
@@ -341,12 +357,17 @@ if [ "$DRY_RUN" = true ]; then
     echo -e "${YELLOW}This was a dry-run. No changes were made.${NC}"
     echo -e "Run without ${BOLD}--dry-run${NC} to actually delete resources."
 else
-    echo -e "${GREEN}All TTG resources have been cleaned up!${NC}"
+    echo -e "${GREEN}TTG resources have been cleaned up!${NC}"
+    echo -e "${BOLD}Note:${NC} Only TTG-specific resources were deleted."
+    echo -e "      Other Docker containers/images were NOT affected."
 fi
 
 echo ""
-echo "Current state:"
-echo "  Kind clusters:  $(kind get clusters 2>/dev/null | wc -l || echo "0")"
-echo "  TTG images:     $(docker images --format "{{.Repository}}" | grep -c "^${IMAGE_NAME}" 2>/dev/null || echo "0")"
-echo "  TTG containers: $(docker ps -a --format "{{.Names}}" | grep -c "^${PROJECT_PREFIX}" 2>/dev/null || echo "0")"
+echo "Remaining TTG resources:"
+KIND_COUNT=$(kind get clusters 2>/dev/null | grep "^${KIND_CLUSTER_NAME}$" | wc -l | tr -d ' ')
+IMAGE_COUNT=$(docker images --format "{{.Repository}}" 2>/dev/null | grep "^${IMAGE_NAME}$" | wc -l | tr -d ' ')
+CONTAINER_COUNT=$(docker ps -a --format "{{.Names}}" 2>/dev/null | grep "^${PROJECT_PREFIX}-" | wc -l | tr -d ' ')
+echo "  Kind clusters:  ${KIND_COUNT:-0}"
+echo "  TTG images:     ${IMAGE_COUNT:-0}"
+echo "  TTG containers: ${CONTAINER_COUNT:-0}"
 echo ""
