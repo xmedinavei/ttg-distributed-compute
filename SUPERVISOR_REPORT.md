@@ -12,16 +12,19 @@
 
 We have successfully built and tested a **distributed computation system** that runs across multiple Kubernetes worker nodes. The system can process 10,000 parameters across 3 parallel workers in under 10 seconds, demonstrating linear scalability potential.
 
+> **Note:** The current worker runs a **simulated workload** (1ms delay per parameter) to prove the infrastructure works. The real algorithm will be integrated in a future milestone.
+
 ### Key Achievements
 
-| Metric                   | Result                          |
-| ------------------------ | ------------------------------- |
-| **Workers**              | 3 parallel workers              |
-| **Nodes**                | 3 dedicated Kubernetes nodes    |
-| **Processing Time**      | ~10 seconds (total)             |
-| **Throughput**           | ~1,500 params/second (combined) |
-| **Parameters Processed** | 10,000                          |
-| **Test Status**          | ✅ All tests passed             |
+| Metric                   | Result                             |
+| ------------------------ | ---------------------------------- |
+| **Workers**              | 3 parallel workers                 |
+| **Nodes**                | 3 dedicated Kubernetes nodes       |
+| **Processing Time**      | ~10 seconds (simulated workload)   |
+| **Throughput**           | ~1,500 params/second (combined)    |
+| **Parameters Processed** | 10,000                             |
+| **Workload Type**        | ⚠️ Simulated (1ms sleep per param) |
+| **Test Status**          | ✅ All tests passed                |
 
 ---
 
@@ -154,6 +157,89 @@ Shows all TTG-related Docker and Kubernetes resources.
 3. **Work Division**: Each worker calculates its parameter range based on `WORKER_ID` and `TOTAL_WORKERS`
 4. **Parallel Execution**: All 3 workers process their slice simultaneously
 5. **Completion**: Kubernetes marks the job complete when all pods finish
+
+---
+
+## What Each Worker Computes (Current Implementation)
+
+> ⚠️ **Important:** The current computation is a **PLACEHOLDER/SIMULATION** to prove the infrastructure works. The real algorithm will be integrated in a future milestone.
+
+### The Computation Code
+
+**File:** `src/worker.py`  
+**Method:** `_compute_parameter()` (lines 170-198)
+
+```python
+def _compute_parameter(self, param_id: int) -> Dict[str, Any]:
+    """
+    Process a single parameter and return the result.
+
+    This is a PLACEHOLDER computation. Replace with your actual algorithm.
+    """
+    # 1. SIMULATED DELAY: Sleep for 1 millisecond per parameter
+    if self.simulate_work_ms > 0:
+        time.sleep(self.simulate_work_ms / 1000.0)  # Default: 1ms
+
+    # 2. PLACEHOLDER COMPUTATION: Generate a hash and fake result
+    input_string = f"param_{param_id}_worker_{self.worker_id}"
+    hash_result = hashlib.sha256(input_string.encode()).hexdigest()[:16]
+
+    # 3. FAKE NUMERICAL RESULT: Simple formula for demonstration
+    numerical_result = (param_id * 7 + 13) % 1000 + float(f"0.{param_id % 100}")
+
+    return {
+        'param_id': param_id,
+        'result': numerical_result,
+        'hash': hash_result,
+        'worker_id': self.worker_id,
+        'timestamp': datetime.now(timezone.utc).isoformat()
+    }
+```
+
+### Why It Takes ~10 Seconds
+
+| Step                           | Calculation                   |
+| ------------------------------ | ----------------------------- |
+| Total parameters               | 10,000                        |
+| Workers                        | 3 (parallel)                  |
+| Parameters per worker          | ~3,333                        |
+| Simulated delay per param      | 1 millisecond                 |
+| Pure sleep time per worker     | 3,333 × 1ms = **3.3 seconds** |
+| Overhead (logging, hashing)    | ~3 seconds                    |
+| **Total per worker**           | **~6.7 seconds**              |
+| **Wall-clock time (parallel)** | **~10 seconds**               |
+
+### What Milestone 1 Proves
+
+| ✅ Proven                     | ❌ Not Yet Implemented |
+| ----------------------------- | ---------------------- |
+| Work distributes across nodes | Real algorithm         |
+| Parallel execution works      | Result aggregation     |
+| Kubernetes scheduling works   | Persistent storage     |
+| Logging and monitoring works  | Error recovery         |
+| Build/deploy pipeline works   | Auto-scaling           |
+
+### To Replace With Real Algorithm
+
+Edit `src/worker.py`, find the `_compute_parameter` method, and replace the placeholder:
+
+```python
+def _compute_parameter(self, param_id: int) -> Dict[str, Any]:
+    # REMOVE: time.sleep simulation
+    # REMOVE: hash placeholder
+
+    # ADD YOUR REAL ALGORITHM HERE:
+    result = your_actual_algorithm(param_id)
+
+    return {
+        'param_id': param_id,
+        'result': result,
+        'worker_id': self.worker_id,
+        'timestamp': datetime.now(timezone.utc).isoformat()
+    }
+```
+
+---
 
 ### Key Components
 
@@ -315,23 +401,45 @@ env:
 
 ## Next Steps
 
-### Immediate (Milestone 2 Preparation)
+### ✅ Milestone 2: Message Queue Architecture (2-WEEK SPRINT)
 
-- [ ] Test with 10 workers / 100,000 parameters
-- [ ] Implement result aggregation
-- [ ] Add persistent storage for results
+> **Full details:** [docs/MILESTONE_2_MESSAGE_QUEUE.md](docs/MILESTONE_2_MESSAGE_QUEUE.md)
 
-### Medium Term
+**Chosen Solution:** Redis Streams  
+**Timeline:** 2 weeks (10 working days)  
+**Target Completion:** February 13, 2026  
+**Status:** 🚀 Ready to start
 
-- [ ] Set up Azure AKS cluster
-- [ ] Implement real algorithm (replace simulation)
-- [ ] Add monitoring (Prometheus/Grafana)
+```
+Week 1: Core Implementation          Week 2: Testing & Documentation
+═══════════════════════════          ═══════════════════════════════
+Day 1-2: Redis + queue_utils.py      Day 6-7: Fault & Scale testing
+Day 3-4: Worker integration          Day 8-9: Documentation update
+Day 5:   Kind E2E test (10K)         Day 10:  Buffer / Demo
+```
 
-### Long Term
+**Key Simplifications for 2-Week Delivery:**
 
-- [ ] Auto-scaling based on workload
-- [ ] Fault tolerance and checkpointing
-- [ ] Cost optimization
+- No separate Coordinator (Worker 0 initializes tasks)
+- No separate Aggregator (query Redis manually)
+- No Celery (pure Redis Streams)
+- Feature toggle for safe rollback
+
+**MVP Success Criteria:**
+
+- [ ] Redis deployed in kind cluster
+- [ ] Workers pull tasks dynamically from queue
+- [ ] Fault tolerance proven (kill pod → task reprocessed)
+- [ ] 10K and 100K parameter tests pass
+- [ ] Documentation updated
+
+### Deferred to Future Phase
+
+- [ ] Celery integration (2 weeks)
+- [ ] Flower monitoring dashboard
+- [ ] Persistent Redis storage
+- [ ] Azure AKS deployment
+- [ ] Real algorithm integration
 
 ---
 
@@ -339,6 +447,7 @@ env:
 
 **Documentation:**
 
+- **Milestone 2 Plan:** [docs/MILESTONE_2_MESSAGE_QUEUE.md](docs/MILESTONE_2_MESSAGE_QUEUE.md) ⬅️ NEW
 - Kind guide: [docs/KIND_EXPLAINED.md](docs/KIND_EXPLAINED.md)
 - K8s concepts: [docs/KUBERNETES_EXPLAINED.md](docs/KUBERNETES_EXPLAINED.md)
 - Configuration: [docs/CONFIGURATION_GUIDE.md](docs/CONFIGURATION_GUIDE.md)
@@ -427,5 +536,6 @@ kind delete cluster --name ttg-cluster
 ---
 
 **Report Generated:** 2026-01-27 00:21 EST  
+**Last Updated:** 2026-01-30  
 **Version:** 1.1.0  
-**Status:** Milestone 1 Complete ✅
+**Status:** Milestone 1 Complete ✅ | Milestone 2 Sprint Starting 🚀

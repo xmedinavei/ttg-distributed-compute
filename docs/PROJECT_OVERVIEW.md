@@ -2,14 +2,18 @@
 
 ## Project Status
 
-| Item                   | Status             | Date       |
-| ---------------------- | ------------------ | ---------- |
-| Project Initialized    | ✅ Complete        | 2026-01-26 |
-| Documentation          | ✅ Complete        | 2026-01-26 |
-| Local K8s Setup (kind) | 🔄 Ready to Deploy | 2026-01-26 |
-| Worker Implementation  | ✅ Complete        | 2026-01-26 |
-| Azure AKS Alternative  | 📋 Documented      | 2026-01-26 |
-| First Milestone        | 🎯 In Progress     | -          |
+| Item                   | Status        | Date       |
+| ---------------------- | ------------- | ---------- |
+| Project Initialized    | ✅ Complete   | 2026-01-26 |
+| Documentation          | ✅ Complete   | 2026-01-26 |
+| Local K8s Setup (kind) | ✅ Complete   | 2026-01-26 |
+| Worker Implementation  | ✅ Complete   | 2026-01-26 |
+| Azure AKS Alternative  | 📋 Documented | 2026-01-26 |
+| **Milestone 1**        | ✅ Complete   | 2026-01-27 |
+| **Milestone 2**        | 📋 Planned    | 2026-01-30 |
+
+> **Milestone 2:** Message Queue Architecture with Redis Streams.  
+> See [MILESTONE_2_MESSAGE_QUEUE.md](./MILESTONE_2_MESSAGE_QUEUE.md) for full details.
 
 ---
 
@@ -340,43 +344,56 @@ For the first milestone, we use Kubernetes **Jobs** with **indexed completions**
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Phase 2: Queue-based Architecture (Future)
+### Phase 2: Queue-based Architecture (Milestone 2 - Planned)
 
-For more complex scenarios, use a message queue:
+> **Status:** Planning complete. See [MILESTONE_2_MESSAGE_QUEUE.md](./MILESTONE_2_MESSAGE_QUEUE.md)
+
+For dynamic load balancing and fault tolerance, we will implement **Redis Streams**:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     K8s CLUSTER (future)                        │
+│                     K8s CLUSTER (Milestone 2)                   │
 │                                                                 │
 │  ┌───────────────┐                                              │
-│  │  COORDINATOR  │                                              │
-│  │  (creates     │                                              │
-│  │   tasks)      │                                              │
+│  │  COORDINATOR  │  Splits work into chunks                     │
+│  │  (K8s Job)    │  XADD to Redis Stream                        │
 │  └───────┬───────┘                                              │
-│          │ publishes tasks                                      │
+│          │ XADD ttg:tasks                                       │
 │          ▼                                                      │
 │  ┌───────────────────────────────────────────────┐              │
-│  │              MESSAGE QUEUE                    │              │
-│  │     (Redis/RabbitMQ/Azure Service Bus)        │              │
-│  │  [Task1][Task2][Task3][Task4][Task5]...       │              │
+│  │           REDIS (StatefulSet)                 │              │
+│  │     Stream: ttg:tasks    Stream: ttg:results  │              │
+│  │     Consumer Group: ttg-workers               │              │
 │  └───────────────────────────────────────────────┘              │
-│          │                                                      │
-│          │ workers pull tasks                                   │
-│          ▼                                                      │
+│          │ XREADGROUP                     ▲ XADD                │
+│          ▼                                │                     │
 │  ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐        │
 │  │ Worker1 │   │ Worker2 │   │ Worker3 │   │ Worker4 │  ...   │
+│  │ XREAD   │   │ XREAD   │   │ XREAD   │   │ XREAD   │        │
+│  │ Process │   │ Process │   │ Process │   │ Process │        │
+│  │ XACK    │   │ XACK    │   │ XACK    │   │ XACK    │        │
 │  └─────────┘   └─────────┘   └─────────┘   └─────────┘        │
 │          │           │             │             │              │
 │          └───────────┴─────────────┴─────────────┘              │
 │                              │                                  │
 │                              ▼                                  │
 │                    ┌─────────────────┐                          │
-│                    │   RESULT STORE  │                          │
-│                    │ (Redis/Storage) │                          │
+│                    │   AGGREGATOR    │                          │
+│                    │   (K8s Job)     │                          │
 │                    └─────────────────┘                          │
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+**Why Redis Streams over other options?**
+
+| Evaluated     | Decision         | Reason                                |
+| ------------- | ---------------- | ------------------------------------- |
+| Redis Lists   | ❌ Rejected      | No acknowledgment, no fault tolerance |
+| Redis Streams | ✅ Chosen        | Balance of simplicity + reliability   |
+| RabbitMQ      | 🔄 Future option | Overkill for current needs            |
+| Kafka         | ❌ Rejected      | Too complex, expensive                |
+| Celery        | 🔄 Phase 2b      | Optional add-on for rich features     |
 
 ---
 
@@ -410,13 +427,14 @@ Setup sandbox Kubernetes environment with 3 worker nodes and run distributed com
 
 ## 📝 Decision Log
 
-| Date       | Decision                         | Rationale                             | Alternatives Considered |
-| ---------- | -------------------------------- | ------------------------------------- | ----------------------- |
-| 2026-01-26 | Use kind for local K8s           | Faster setup, free, good for learning | minikube, k3s           |
-| 2026-01-26 | Start with K8s Jobs (not queues) | Simpler for first milestone           | Celery, RabbitMQ, Kafka |
-| 2026-01-26 | Python for workers               | User preference, good ecosystem       | Go, Java                |
-| 2026-01-26 | 3 worker nodes                   | Matches milestone requirement         | More nodes              |
-| 2026-01-26 | Indexed Jobs for distribution    | K8s native, no external dependencies  | Job arrays, manual      |
+| Date       | Decision                          | Rationale                                  | Alternatives Considered |
+| ---------- | --------------------------------- | ------------------------------------------ | ----------------------- |
+| 2026-01-26 | Use kind for local K8s            | Faster setup, free, good for learning      | minikube, k3s           |
+| 2026-01-26 | Start with K8s Jobs (not queues)  | Simpler for first milestone                | Celery, RabbitMQ, Kafka |
+| 2026-01-26 | Python for workers                | User preference, good ecosystem            | Go, Java                |
+| 2026-01-26 | 3 worker nodes                    | Matches milestone requirement              | More nodes              |
+| 2026-01-26 | Indexed Jobs for distribution     | K8s native, no external dependencies       | Job arrays, manual      |
+| 2026-01-30 | **Redis Streams for Milestone 2** | Best balance: simplicity + fault tolerance | RabbitMQ, Kafka, Celery |
 
 ---
 
@@ -445,38 +463,52 @@ Setup sandbox Kubernetes environment with 3 worker nodes and run distributed com
 ```
 TTG/
 ├── docs/
-│   ├── PROJECT_OVERVIEW.md      # ← You are here
-│   └── KUBERNETES_SETUP.md      # Setup instructions
+│   ├── PROJECT_OVERVIEW.md           # ← You are here
+│   ├── MILESTONE_2_MESSAGE_QUEUE.md  # Milestone 2 planning
+│   ├── KUBERNETES_SETUP.md           # Setup instructions
+│   ├── KUBERNETES_EXPLAINED.md       # K8s concepts deep dive
+│   ├── KIND_EXPLAINED.md             # kind tutorial
+│   ├── CONFIGURATION_GUIDE.md        # Scaling reference
+│   └── AZURE_AKS_GUIDE.md            # Azure alternative
 ├── docker/
-│   └── Dockerfile               # Worker container
+│   └── Dockerfile                    # Worker container (OCI labels)
 ├── src/
-│   ├── worker.py                # Computation worker
-│   └── utils.py                 # Utilities
+│   ├── worker.py                     # Computation worker
+│   └── logging_config.py             # Structured logging
 ├── k8s/
 │   ├── local/
-│   │   ├── kind-config.yaml     # 3-node cluster config
-│   │   └── setup-local.sh       # Local setup script
-│   ├── azure/
-│   │   └── setup-aks.sh         # Azure AKS setup
+│   │   ├── kind-config.yaml          # 3-node cluster config
+│   │   └── setup-local.sh            # Local setup script
 │   └── manifests/
-│       ├── worker-job.yaml      # Single job template
-│       └── parallel-jobs.yaml   # Parallel job spec
+│       ├── worker-job.yaml           # Single job template
+│       └── parallel-jobs.yaml        # Parallel job spec
 ├── scripts/
-│   ├── build.sh                 # Build Docker image
-│   ├── deploy.sh                # Deploy to K8s
-│   └── cleanup.sh               # Clean up resources
-├── requirements.txt             # Python dependencies
-└── README.md                    # Quick start
+│   ├── build.sh                      # Versioned image building
+│   ├── deploy.sh                     # Deploy to K8s
+│   ├── list-resources.sh             # Resource inventory
+│   └── cleanup-all.sh                # Safe cleanup (dry-run)
+├── requirements.txt                  # Python dependencies
+├── README.md                         # Quick start
+└── SUPERVISOR_REPORT.md              # Executive summary
 ```
 
 ---
 
 ## 🔜 Next Steps
 
+### If Starting Fresh (Milestone 1)
+
 1. **Read** [KUBERNETES_SETUP.md](./KUBERNETES_SETUP.md) for setup instructions
 2. **Choose** Local (kind) or Azure (AKS)
 3. **Follow** the step-by-step guide
 4. **Run** your first distributed computation!
+
+### If Milestone 1 Complete (Current)
+
+1. **Review** [MILESTONE_2_MESSAGE_QUEUE.md](./MILESTONE_2_MESSAGE_QUEUE.md) for the message queue plan
+2. **Approve** scope with supervisor (Phase 2a, or include 2b)
+3. **Begin** Redis Streams implementation
+4. **Test** fault tolerance and dynamic scaling
 
 ---
 
@@ -489,5 +521,6 @@ TTG/
 
 ---
 
-_Last Updated: 2026-01-26_
-_Author: TTG Team_
+_Last Updated: 2026-01-30_  
+_Author: TTG Team_  
+_Milestone 2 Planning: Complete_
