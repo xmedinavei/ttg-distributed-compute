@@ -1,6 +1,6 @@
 # Day 3 Test Results: Fault Tolerance Verification
 
-**Date:** February 3, 2025  
+**Date:** February 3, 2026  
 **Milestone:** 2 - Queue Mode  
 **Status:** ✅ **COMPLETE**
 
@@ -59,13 +59,15 @@ Day 3 testing **successfully verified fault tolerance** in the TTG distributed c
 
 | Metric          | Result                 |
 | --------------- | ---------------------- |
-| Configuration   | 2 workers, 1000 params |
+| Configuration   | 3 workers, 1000 params |
 | Total Chunks    | 100                    |
-| Worker Killed   | At 34% (34 chunks)     |
+| Worker Killed   | At 30% progress        |
 | Final Result    | **100/100 chunks**     |
-| Completion Time | 81 seconds             |
-| Throughput      | 12 params/sec          |
+| Completion Time | **44 seconds**         |
+| Throughput      | **22 params/sec**      |
 | Status          | ✅ **PASSED**          |
+
+**Key Result:** 100% completion despite worker failure, proving fault tolerance works.
 
 ---
 

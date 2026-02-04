@@ -9,39 +9,52 @@
 
 ## Executive Summary
 
-Distributed computation system using Kubernetes to process 10,000 parameters across multiple worker nodes. Milestone 1 completed successfully with 3-worker parallel processing. **Milestone 2 (Message Queue) is now 80% complete** with Redis Streams implemented, queue mode workers deployed and tested end-to-end.
+Distributed computation system using Kubernetes to process 10,000 parameters across multiple worker nodes. Milestone 1 completed successfully with 3-worker parallel processing. **Milestone 2 (Message Queue) is 100% COMPLETE** with Redis Streams implemented, queue mode workers deployed, fault tolerance verified (100/100 chunks completed despite worker failure).
 
 ---
 
 ## Milestones & Deliverables
 
-| Milestone             | Deliverables                                    | Status      | Completion Date | Notes                                |
-| --------------------- | ----------------------------------------------- | ----------- | --------------- | ------------------------------------ |
-| **M1: Basic Setup**   | K8s cluster, worker container, parallel jobs    | ✅ Complete | 2026-01-27      | 3 workers, 10K params, 8s runtime    |
-| **M2: Message Queue** | Redis Streams, dynamic scaling, fault tolerance | 🟡 80% Done | 2026-02-06      | Core complete, fault tolerance Day 3 |
-| **M3: Production**    | AKS deployment, monitoring, optimization        | ⏳ Future   | TBD             | Pending M2 completion                |
+| Milestone             | Deliverables                                    | Status      | Completion Date | Notes                                       |
+| --------------------- | ----------------------------------------------- | ----------- | --------------- | ------------------------------------------- |
+| **M1: Basic Setup**   | K8s cluster, worker container, parallel jobs    | ✅ Complete | 2026-01-27      | 3 workers, 10K params, 8s runtime           |
+| **M2: Message Queue** | Redis Streams, dynamic scaling, fault tolerance | ✅ Complete | 2026-02-03      | 100/100 chunks, 44s, fault tolerance proven |
+| **M3: Production**    | AKS deployment, monitoring, optimization        | ⏳ Future   | TBD             | Ready to start                              |
 
 ---
 
 ## Current Sprint (Week of Feb 3-6) - ACCELERATED
 
-**Milestone 2: Message Queue Implementation (Compressed 4-Day Sprint)**
+**Milestone 2: Message Queue Implementation (COMPLETE)**
 
-| Task                    | Status      | Owner | Due Date   | Notes                               |
-| ----------------------- | ----------- | ----- | ---------- | ----------------------------------- |
-| Redis deployment to K8s | ✅ Complete | Team  | 2026-02-03 | Pod + Service + PVC deployed        |
-| Queue utilities module  | ✅ Complete | Team  | 2026-02-03 | queue_utils.py with TaskQueue class |
-| QueueWorker class       | ✅ Complete | Team  | 2026-02-03 | worker.py v1.2.0 with queue mode    |
-| Docker image v1.2.0     | ✅ Complete | Team  | 2026-02-03 | Built and loaded to Kind            |
-| E2E integration test    | ✅ Complete | Team  | 2026-02-03 | 10K params, 3 workers, all results  |
-| Fault tolerance testing | 📋 Planned  | Team  | 2026-02-04 | Kill pod mid-run, verify recovery   |
-| Monitoring setup        | 📋 Planned  | Team  | 2026-02-04 | RedisInsight or CLI dashboard       |
-| Documentation           | ✅ Complete | Team  | 2026-02-03 | QUEUE_MODE_GUIDE.md created         |
-| Demo preparation        | 📋 Planned  | Team  | 2026-02-06 | Full run-through for Friday demo    |
+| Task                    | Status      | Owner | Due Date   | Notes                                     |
+| ----------------------- | ----------- | ----- | ---------- | ----------------------------------------- |
+| Redis deployment to K8s | ✅ Complete | Team  | 2026-02-03 | Pod + Service + PVC deployed              |
+| Queue utilities module  | ✅ Complete | Team  | 2026-02-03 | queue_utils.py with TaskQueue class       |
+| QueueWorker class       | ✅ Complete | Team  | 2026-02-03 | worker.py v1.2.1 with queue mode          |
+| Docker image v1.2.1     | ✅ Complete | Team  | 2026-02-03 | Built and loaded to Kind                  |
+| E2E integration test    | ✅ Complete | Team  | 2026-02-03 | 10K params, 3 workers, all results        |
+| Fault tolerance testing | ✅ Complete | Team  | 2026-02-03 | 100/100 chunks despite worker kill at 30% |
+| Monitoring setup        | ✅ Complete | Team  | 2026-02-03 | RedisInsight + CLI dashboard              |
+| Documentation           | ✅ Complete | Team  | 2026-02-03 | All docs updated                          |
+| Demo preparation        | ✅ Complete | Team  | 2026-02-03 | run-demo.sh --fault-demo ready            |
 
 ---
 
-## Milestone 2 Achievement Summary (In Progress)
+## Milestone 2 Achievement Summary (COMPLETE)
+
+### Fault Tolerance Demo Results (Final)
+
+| Metric               | Value                                  |
+| -------------------- | -------------------------------------- |
+| **Total Chunks**     | 100/100 completed                      |
+| **Workers Deployed** | 3 (parallel, queue-based)              |
+| **Worker Killed At** | 30% progress                           |
+| **Total Time**       | **44 seconds**                         |
+| **Throughput**       | **22 params/sec**                      |
+| **Fault Tolerance**  | ✅ **VERIFIED** - 100% despite failure |
+
+### Full Scale Test Results
 
 | Metric                         | Value                                    |
 | ------------------------------ | ---------------------------------------- |
@@ -58,15 +71,19 @@ Distributed computation system using Kubernetes to process 10,000 parameters acr
 
 ### Key Files Created/Modified (v1.2.0)
 
-| File                                     | Status   | Purpose                                |
-| ---------------------------------------- | -------- | -------------------------------------- |
-| `src/queue_utils.py`                     | NEW      | Redis Streams wrapper (TaskQueue)      |
-| `src/worker.py`                          | MODIFIED | Added QueueWorker class, v1.2.0        |
-| `k8s/manifests/redis.yaml`               | NEW      | Redis Pod + Service + PVC              |
-| `k8s/manifests/parallel-jobs-queue.yaml` | NEW      | Queue mode K8s Job manifest            |
-| `docker/Dockerfile`                      | MODIFIED | Added queue environment variables      |
-| `scripts/aggregate_results.py`           | NEW      | Results aggregation from Redis         |
-| `docs/QUEUE_MODE_GUIDE.md`               | NEW      | Comprehensive queue mode documentation |
+| File                                             | Status   | Purpose                                |
+| ------------------------------------------------ | -------- | -------------------------------------- |
+| `src/queue_utils.py`                             | NEW      | Redis Streams wrapper (TaskQueue)      |
+| `src/worker.py`                                  | MODIFIED | Added QueueWorker class, v1.2.1        |
+| `k8s/manifests/redis.yaml`                       | NEW      | Redis Pod + Service + PVC              |
+| `k8s/manifests/parallel-workers-standalone.yaml` | NEW      | Standalone pods for fault demo         |
+| `docker/Dockerfile`                              | MODIFIED | Added queue environment variables      |
+| `scripts/run-demo.sh`                            | NEW      | Full demo with fault injection         |
+| `scripts/cleanup-ttg.sh`                         | NEW      | Safe cleanup with protected resources  |
+| `scripts/recover-infra.sh`                       | NEW      | Infrastructure recovery script         |
+| `scripts/aggregate_results.py`                   | NEW      | Results aggregation from Redis         |
+| `docs/QUEUE_MODE_GUIDE.md`                       | NEW      | Comprehensive queue mode documentation |
+| `docs/TEST_RESULTS_DAY3.md`                      | NEW      | Fault tolerance test results           |
 
 ---
 
@@ -98,8 +115,10 @@ Distributed computation system using Kubernetes to process 10,000 parameters acr
 - ✅ Horizontal scaling capability (workers pull dynamically)
 - ✅ Message acknowledgment (XACK)
 - ✅ Result persistence in Redis
-- 📋 Fault tolerance testing (Day 3)
-- 📋 Stale task recovery (claim_stale_tasks implemented)
+- ✅ Fault tolerance testing (Day 3) - **VERIFIED**
+- ✅ Stale task recovery (claim_stale_tasks implemented)
+- ✅ Demo script with fault injection (run-demo.sh)
+- ✅ Safe cleanup script (cleanup-ttg.sh)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -149,24 +168,9 @@ Distributed computation system using Kubernetes to process 10,000 parameters acr
 
 ## Next Steps
 
-1. **Day 3 (Feb 4):** Fault tolerance testing - kill pod mid-run, verify recovery
-2. **Day 3 (Feb 4):** Monitoring setup - RedisInsight or CLI dashboard
-3. **Day 4 (Feb 6):** Final testing, demo preparation, polish documentation
-4. **Milestone 3 (Future):** Azure AKS deployment, production monitoring
-
----
-
-## Repository & Documentation
-
-- **GitHub:** xmedinavei/ttg-distributed-compute
-- **Branch:** master
-- **Version:** v1.2.0 (Queue Mode)
-- **Documentation:** `docs/` folder
-  - PROJECT_OVERVIEW.md (detailed technical guide)
-  - MILESTONE_2_MESSAGE_QUEUE.md (M2 planning)
-  - **QUEUE_MODE_GUIDE.md** (NEW - comprehensive queue mode docs)
-  - KUBERNETES_SETUP.md (setup instructions)
-  - SUPERVISOR_REPORT.md (executive summary)
+1. **Milestone 3 (Future):** Azure AKS deployment, production monitoring
+2. **Real algorithm integration** (when ready)
+3. **Persistent Redis storage** (if needed for production)
 
 ---
 
@@ -182,34 +186,23 @@ kind load docker-image ttg-worker:v1.1.0 --name ttg-sandbox
 kubectl apply -f k8s/manifests/parallel-jobs.yaml
 ```
 
-### Milestone 2 (Queue Mode)
+### Milestone 2 (Queue Mode) - RECOMMENDED
 
 ```bash
-# Prerequisites: Kind cluster running, Redis deployed
+# Full demo with fault tolerance (easiest method)
+./scripts/run-demo.sh --scale small --fault-demo --monitor cli
 
-# Build and load image
-./scripts/build.sh --version 1.2.0
-kind load docker-image ttg-worker:v1.2.0 --name ttg-sandbox
+# Or with RedisInsight (visual)
+./scripts/run-demo.sh --scale small --fault-demo --monitor both
 
-# Clear previous data (optional)
-kubectl exec ttg-redis -- redis-cli FLUSHALL
+# Options:
+#   --scale small|medium    (1K or 10K params)
+#   --workers N             (number of workers, default 3)
+#   --fault-demo            (kill worker at 30%)
+#   --monitor cli|web|both  (monitoring tools)
 
-# Deploy queue mode workers
-kubectl apply -f k8s/manifests/parallel-jobs-queue.yaml
-
-# Monitor progress
-kubectl get pods -l ttg.io/mode=queue -w
-kubectl logs -l ttg.io/mode=queue -f
-
-# Check results
-kubectl exec ttg-redis -- redis-cli XLEN ttg:results
-
-# Aggregate results
-kubectl port-forward pod/ttg-redis 16379:6379 &
-python scripts/aggregate_results.py --port 16379
-
-# Cleanup (job only, keeps Redis data)
-kubectl delete job ttg-computation-queue
+# Cleanup after demo
+./scripts/cleanup-ttg.sh --pods --force
 ```
 
 ---

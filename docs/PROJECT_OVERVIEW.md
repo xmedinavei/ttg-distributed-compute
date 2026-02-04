@@ -10,9 +10,10 @@
 | Worker Implementation  | ✅ Complete   | 2026-01-26 |
 | Azure AKS Alternative  | 📋 Documented | 2026-01-26 |
 | **Milestone 1**        | ✅ Complete   | 2026-01-27 |
-| **Milestone 2**        | 📋 Planned    | 2026-01-30 |
+| **Milestone 2**        | ✅ Complete   | 2026-02-03 |
 
-> **Milestone 2:** Message Queue Architecture with Redis Streams.  
+> **Milestone 2 Complete!** Message Queue Architecture with Redis Streams.  
+> Fault tolerance verified: 100/100 chunks completed in 44s (22 params/sec) despite worker killed at 30%.  
 > See [MILESTONE_2_MESSAGE_QUEUE.md](./MILESTONE_2_MESSAGE_QUEUE.md) for full details.
 
 ---
