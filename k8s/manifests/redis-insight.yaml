@@ -1,0 +1,104 @@
+# RedisInsight - Visual Redis Management UI
+#
+# RedisInsight is Redis's official GUI for inspecting and managing Redis data.
+# It provides a visual way to:
+#   - Browse Redis keys and values
+#   - View Streams (ttg:tasks, ttg:results)
+#   - Monitor real-time activity
+#   - Execute Redis commands
+#
+# Deploy:
+#   kubectl apply -f redis-insight.yaml
+#
+# Access (after deploying):
+#   kubectl port-forward pod/redis-insight 8001:8001
+#   Open: http://localhost:8001
+#
+# First-time setup in RedisInsight:
+#   1. Click "Add Redis Database"
+#   2. Host: ttg-redis
+#   3. Port: 6379
+#   4. Name: TTG Redis (or any name)
+#   5. Click "Add Redis Database"
+#
+# Useful Views:
+#   - Browser: Navigate to Streams > ttg:tasks, ttg:results
+#   - Workbench: Run commands like XLEN ttg:tasks
+#   - Streams: Visual representation of task/result streams
+#
+# Clean up:
+#   kubectl delete -f redis-insight.yaml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: redis-insight
+  labels:
+    app.kubernetes.io/name: redis-insight
+    app.kubernetes.io/component: monitoring
+    app.kubernetes.io/part-of: ttg-distributed-compute
+    ttg.io/project: distributed-compute
+    ttg.io/role: monitoring
+  annotations:
+    description: "Redis GUI for monitoring TTG task queues"
+spec:
+  containers:
+    - name: redisinsight
+      image: redislabs/redisinsight:latest
+      imagePullPolicy: IfNotPresent
+
+      ports:
+        - name: web
+          containerPort: 8001
+          protocol: TCP
+
+      # RedisInsight data persistence (optional)
+      env:
+        - name: RI_APP_PORT
+          value: "8001"
+        - name: RI_LOG_LEVEL
+          value: "info"
+
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "100m"
+        limits:
+          memory: "512Mi"
+          cpu: "500m"
+
+      # Health checks
+      readinessProbe:
+        httpGet:
+          path: /api/health
+          port: 8001
+        initialDelaySeconds: 5
+        periodSeconds: 10
+
+      livenessProbe:
+        httpGet:
+          path: /api/health
+          port: 8001
+        initialDelaySeconds: 15
+        periodSeconds: 20
+
+  restartPolicy: Always
+
+---
+# Optional: Service for internal cluster access
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-insight
+  labels:
+    app.kubernetes.io/name: redis-insight
+    app.kubernetes.io/component: monitoring
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8001
+      targetPort: 8001
+      protocol: TCP
+      name: web
+  selector:
+    app.kubernetes.io/name: redis-insight

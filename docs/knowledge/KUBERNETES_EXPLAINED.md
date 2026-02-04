@@ -860,10 +860,10 @@ Best for: Coordination-heavy workloads
 
 Now that you understand the concepts:
 
-1. **Set up your cluster**: See [KUBERNETES_SETUP.md](./KUBERNETES_SETUP.md)
-2. **Deploy workers**: Follow the Quick Start in [README.md](../README.md)
-3. **Configure scaling**: See [CONFIGURATION_GUIDE.md](./CONFIGURATION_GUIDE.md)
-4. **Try Azure**: See [AZURE_AKS_GUIDE.md](./AZURE_AKS_GUIDE.md)
+1. **Set up your cluster**: See [KUBERNETES_SETUP.md](../setup/KUBERNETES_SETUP.md)
+2. **Deploy workers**: Follow the Quick Start in [README.md](../../README.md)
+3. **Configure scaling**: See [CONFIGURATION_GUIDE.md](../guides/CONFIGURATION_GUIDE.md)
+4. **Try Azure**: See [AZURE_AKS_GUIDE.md](../setup/AZURE_AKS_GUIDE.md)
 
 ---
 

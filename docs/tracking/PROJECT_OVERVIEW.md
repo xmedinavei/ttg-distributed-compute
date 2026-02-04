@@ -10,10 +10,11 @@
 | Worker Implementation  | ✅ Complete   | 2026-01-26 |
 | Azure AKS Alternative  | 📋 Documented | 2026-01-26 |
 | **Milestone 1**        | ✅ Complete   | 2026-01-27 |
-| **Milestone 2**        | 📋 Planned    | 2026-01-30 |
+| **Milestone 2**        | ✅ Complete   | 2026-02-03 |
 
-> **Milestone 2:** Message Queue Architecture with Redis Streams.  
-> See [MILESTONE_2_MESSAGE_QUEUE.md](./MILESTONE_2_MESSAGE_QUEUE.md) for full details.
+> **Milestone 2 Complete!** Message Queue Architecture with Redis Streams.  
+> Fault tolerance verified: 100/100 chunks completed in 44s (22 params/sec) despite worker killed at 30%.  
+> See [M2_QUEUE_ARCHITECTURE.md](../architecture/M2_QUEUE_ARCHITECTURE.md) for full details.
 
 ---
 
@@ -346,7 +347,7 @@ For the first milestone, we use Kubernetes **Jobs** with **indexed completions**
 
 ### Phase 2: Queue-based Architecture (Milestone 2 - Planned)
 
-> **Status:** Planning complete. See [MILESTONE_2_MESSAGE_QUEUE.md](./MILESTONE_2_MESSAGE_QUEUE.md)
+> **Status:** Planning complete. See [M2_QUEUE_ARCHITECTURE.md](../architecture/M2_QUEUE_ARCHITECTURE.md)
 
 For dynamic load balancing and fault tolerance, we will implement **Redis Streams**:
 
@@ -463,13 +464,24 @@ Setup sandbox Kubernetes environment with 3 worker nodes and run distributed com
 ```
 TTG/
 ├── docs/
-│   ├── PROJECT_OVERVIEW.md           # ← You are here
-│   ├── MILESTONE_2_MESSAGE_QUEUE.md  # Milestone 2 planning
-│   ├── KUBERNETES_SETUP.md           # Setup instructions
-│   ├── KUBERNETES_EXPLAINED.md       # K8s concepts deep dive
-│   ├── KIND_EXPLAINED.md             # kind tutorial
-│   ├── CONFIGURATION_GUIDE.md        # Scaling reference
-│   └── AZURE_AKS_GUIDE.md            # Azure alternative
+│   ├── README.md                     # Documentation index
+│   ├── architecture/
+│   │   └── M2_QUEUE_ARCHITECTURE.md  # Queue system design
+│   ├── guides/
+│   │   ├── CONFIGURATION_GUIDE.md    # Config reference
+│   │   └── QUEUE_MODE_GUIDE.md       # Queue operations
+│   ├── knowledge/
+│   │   ├── KIND_EXPLAINED.md         # Kind tutorial
+│   │   └── KUBERNETES_EXPLAINED.md   # K8s concepts
+│   ├── results/
+│   │   ├── TEST_RESULTS_M1_...md     # M1 test results
+│   │   └── TEST_RESULTS_M2_...md     # M2 test results
+│   ├── setup/
+│   │   ├── AZURE_AKS_GUIDE.md        # Azure setup
+│   │   └── KUBERNETES_SETUP.md       # Local K8s setup
+│   └── tracking/
+│       ├── PROJECT_OVERVIEW.md       # ← You are here
+│       └── PROJECT_TRACKER.md        # Milestone tracking
 ├── docker/
 │   └── Dockerfile                    # Worker container (OCI labels)
 ├── src/
@@ -498,14 +510,14 @@ TTG/
 
 ### If Starting Fresh (Milestone 1)
 
-1. **Read** [KUBERNETES_SETUP.md](./KUBERNETES_SETUP.md) for setup instructions
+1. **Read** [KUBERNETES_SETUP.md](../setup/KUBERNETES_SETUP.md) for setup instructions
 2. **Choose** Local (kind) or Azure (AKS)
 3. **Follow** the step-by-step guide
 4. **Run** your first distributed computation!
 
 ### If Milestone 1 Complete (Current)
 
-1. **Review** [MILESTONE_2_MESSAGE_QUEUE.md](./MILESTONE_2_MESSAGE_QUEUE.md) for the message queue plan
+1. **Review** [M2_QUEUE_ARCHITECTURE.md](../architecture/M2_QUEUE_ARCHITECTURE.md) for the message queue architecture
 2. **Approve** scope with supervisor (Phase 2a, or include 2b)
 3. **Begin** Redis Streams implementation
 4. **Test** fault tolerance and dynamic scaling

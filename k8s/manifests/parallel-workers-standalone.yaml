@@ -1,0 +1,264 @@
+# TTG Fault Tolerance Demo - Standalone Workers
+#
+# This manifest deploys 3 INDEPENDENT worker pods (not managed by a Job or Deployment).
+# This is ideal for demonstrating fault tolerance because:
+#   - Killing one pod does NOT affect the others
+#   - No automatic restart - killed pods stay dead
+#   - Surviving workers can claim orphaned tasks via XCLAIM
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# DEMO WORKFLOW:
+# ═══════════════════════════════════════════════════════════════════════════
+#
+#   1. Deploy all 3 workers:
+#      kubectl apply -f parallel-workers-standalone.yaml
+#
+#   2. Watch progress (in separate terminal):
+#      watch -n2 'kubectl exec ttg-redis -- redis-cli XLEN ttg:results'
+#
+#   3. Wait ~10 seconds for processing to begin, then KILL worker-1:
+#      kubectl delete pod ttg-worker-1 --force --grace-period=0
+#
+#   4. Check pending tasks (should show orphaned task from worker-1):
+#      kubectl exec ttg-redis -- redis-cli XPENDING ttg:tasks ttg-workers
+#
+#   5. Wait 30-60 seconds for stale task recovery
+#
+#   6. Watch recovery happen in logs:
+#      kubectl logs ttg-worker-0 -f | grep -i "FAULT\|RECOVERY\|claimed"
+#
+#   7. Verify all 100 chunks completed:
+#      kubectl exec ttg-redis -- redis-cli XLEN ttg:results
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# EXPECTED OUTCOME:
+# ═══════════════════════════════════════════════════════════════════════════
+#
+#   - Total chunks: 100 (1000 params / 10 per chunk)
+#   - After killing worker-1: ~33 chunks from worker-1's queue become orphaned
+#   - After 30s: Worker-0 or Worker-2 claims stale tasks via XCLAIM
+#   - Final result: ALL 100 chunks completed despite worker failure
+#
+# ═══════════════════════════════════════════════════════════════════════════
+# CLEANUP:
+# ═══════════════════════════════════════════════════════════════════════════
+#
+#   kubectl delete pod ttg-worker-0 ttg-worker-1 ttg-worker-2 2>/dev/null
+#   kubectl exec ttg-redis -- redis-cli FLUSHALL
+#
+# ═══════════════════════════════════════════════════════════════════════════
+
+---
+# Worker 0 - Will survive and potentially claim orphaned tasks
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ttg-worker-0
+  labels:
+    app.kubernetes.io/name: ttg-worker
+    app.kubernetes.io/component: fault-tolerance-demo
+    ttg.io/project: distributed-compute
+    ttg.io/mode: fault-demo-standalone
+    ttg.io/worker-id: "0"
+spec:
+  restartPolicy: Never
+  containers:
+    - name: worker
+      image: ttg-worker:v1.2.1
+      imagePullPolicy: Never
+      env:
+        - name: WORKER_ID
+          value: "0"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        # Redis connection
+        - name: REDIS_HOST
+          value: "ttg-redis"
+        - name: REDIS_PORT
+          value: "6379"
+        # Queue mode enabled
+        - name: USE_QUEUE
+          value: "true"
+        # Queue configuration
+        - name: QUEUE_STREAM
+          value: "ttg:tasks"
+        - name: RESULTS_STREAM
+          value: "ttg:results"
+        - name: CONSUMER_GROUP
+          value: "ttg-workers"
+        # Workload (SLOW for demo)
+        - name: TOTAL_PARAMETERS
+          value: "1000"
+        - name: CHUNK_SIZE
+          value: "10"
+        - name: SIMULATE_WORK_MS
+          value: "100"
+        # Timeout and recovery settings
+        - name: IDLE_TIMEOUT_SECONDS
+          value: "180" # 3 minutes - long enough for recovery
+        - name: STALE_CHECK_INTERVAL_SECONDS
+          value: "15" # Check every 15s
+        - name: STALE_THRESHOLD_MS
+          value: "30000" # 30 seconds = stale
+        # Other
+        - name: SKIP_ENQUEUE
+          value: "false"
+        - name: DEBUG_LOGGING
+          value: "true"
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "100m"
+        limits:
+          memory: "256Mi"
+          cpu: "300m"
+
+---
+# Worker 1 - This is the one we'll KILL to test fault tolerance
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ttg-worker-1
+  labels:
+    app.kubernetes.io/name: ttg-worker
+    app.kubernetes.io/component: fault-tolerance-demo
+    ttg.io/project: distributed-compute
+    ttg.io/mode: fault-demo-standalone
+    ttg.io/worker-id: "1"
+  annotations:
+    ttg.io/demo-note: "This worker will be killed to demonstrate fault tolerance"
+spec:
+  restartPolicy: Never
+  containers:
+    - name: worker
+      image: ttg-worker:v1.2.1
+      imagePullPolicy: Never
+      env:
+        - name: WORKER_ID
+          value: "1"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: REDIS_HOST
+          value: "ttg-redis"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: USE_QUEUE
+          value: "true"
+        - name: QUEUE_STREAM
+          value: "ttg:tasks"
+        - name: RESULTS_STREAM
+          value: "ttg:results"
+        - name: CONSUMER_GROUP
+          value: "ttg-workers"
+        - name: TOTAL_PARAMETERS
+          value: "1000"
+        - name: CHUNK_SIZE
+          value: "10"
+        - name: SIMULATE_WORK_MS
+          value: "100"
+        - name: IDLE_TIMEOUT_SECONDS
+          value: "180"
+        - name: STALE_CHECK_INTERVAL_SECONDS
+          value: "15"
+        - name: STALE_THRESHOLD_MS
+          value: "30000"
+        - name: SKIP_ENQUEUE
+          value: "false"
+        - name: DEBUG_LOGGING
+          value: "true"
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "100m"
+        limits:
+          memory: "256Mi"
+          cpu: "300m"
+
+---
+# Worker 2 - Will survive and potentially claim orphaned tasks
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ttg-worker-2
+  labels:
+    app.kubernetes.io/name: ttg-worker
+    app.kubernetes.io/component: fault-tolerance-demo
+    ttg.io/project: distributed-compute
+    ttg.io/mode: fault-demo-standalone
+    ttg.io/worker-id: "2"
+spec:
+  restartPolicy: Never
+  containers:
+    - name: worker
+      image: ttg-worker:v1.2.1
+      imagePullPolicy: Never
+      env:
+        - name: WORKER_ID
+          value: "2"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: REDIS_HOST
+          value: "ttg-redis"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: USE_QUEUE
+          value: "true"
+        - name: QUEUE_STREAM
+          value: "ttg:tasks"
+        - name: RESULTS_STREAM
+          value: "ttg:results"
+        - name: CONSUMER_GROUP
+          value: "ttg-workers"
+        - name: TOTAL_PARAMETERS
+          value: "1000"
+        - name: CHUNK_SIZE
+          value: "10"
+        - name: SIMULATE_WORK_MS
+          value: "100"
+        - name: IDLE_TIMEOUT_SECONDS
+          value: "180"
+        - name: STALE_CHECK_INTERVAL_SECONDS
+          value: "15"
+        - name: STALE_THRESHOLD_MS
+          value: "30000"
+        - name: SKIP_ENQUEUE
+          value: "false"
+        - name: DEBUG_LOGGING
+          value: "true"
+      resources:
+        requests:
+          memory: "128Mi"
+          cpu: "100m"
+        limits:
+          memory: "256Mi"
+          cpu: "300m"

@@ -1,0 +1,158 @@
+# TTG Fault Tolerance Test Job (Milestone 2 - Day 3)
+#
+# This manifest is specifically designed to test fault tolerance:
+#   - More chunks (200 chunks for 20K params) to provide time to kill workers
+#   - Slower processing (5ms/param instead of 1ms)
+#   - 5 workers to demonstrate dynamic load balancing
+#   - Shortened idle timeout for faster recovery
+#
+# HOW TO TEST FAULT TOLERANCE:
+#
+#   1. Clear Redis and deploy:
+#      kubectl exec ttg-redis -- redis-cli FLUSHALL
+#      kubectl apply -f parallel-jobs-fault-test.yaml
+#
+#   2. Watch the pods:
+#      kubectl get pods -l ttg.io/mode=fault-test -w
+#
+#   3. After ~30% progress, kill a worker:
+#      kubectl delete pod ttg-fault-test-0-xxxxx --force --grace-period=0
+#
+#   4. Watch recovery (within 60-90 seconds):
+#      kubectl logs -l ttg.io/mode=fault-test -f | grep -E "(FAULT RECOVERY|🔄)"
+#
+#   5. Verify all results complete:
+#      kubectl exec ttg-redis -- redis-cli XLEN ttg:results
+#      # Should show 200 (all chunks)
+#
+# Expected behavior:
+#   - Killed worker's pending task stays in Redis PEL
+#   - After 60s, another worker claims it via XCLAIM
+#   - Task is processed and result published
+#   - All 200 results appear in ttg:results
+#
+# Clean up:
+#   kubectl delete job ttg-fault-test
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ttg-fault-test
+  labels:
+    app.kubernetes.io/name: ttg-worker
+    app.kubernetes.io/instance: ttg-fault-test
+    app.kubernetes.io/version: "1.2.0"
+    app.kubernetes.io/component: fault-tolerance-test
+    app.kubernetes.io/part-of: ttg-distributed-compute
+    ttg.io/project: distributed-compute
+    ttg.io/milestone: "2"
+    ttg.io/mode: fault-test
+  annotations:
+    description: "TTG fault tolerance test - kill workers to verify recovery"
+    ttg.io/total-parameters: "20000"
+    ttg.io/chunk-size: "100"
+    ttg.io/worker-count: "5"
+spec:
+  completions: 5 # 5 workers
+  parallelism: 5 # All run simultaneously
+  completionMode: Indexed
+  backoffLimit: 6 # Higher retry limit for fault testing
+  ttlSecondsAfterFinished: 7200 # Keep pods for 2 hours for log analysis
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ttg-worker
+        app.kubernetes.io/instance: ttg-fault-test
+        app.kubernetes.io/version: "1.2.0"
+        app.kubernetes.io/component: fault-tolerance-test
+        ttg.io/project: distributed-compute
+        ttg.io/mode: fault-test
+      annotations:
+        ttg.io/test-type: "fault-tolerance"
+    spec:
+      # Spread workers across nodes
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    ttg.io/mode: fault-test
+                topologyKey: kubernetes.io/hostname
+
+      restartPolicy: Never # Don't auto-restart on failure (we want to see the failure)
+
+      containers:
+        - name: worker
+          image: ttg-worker:v1.2.1
+          imagePullPolicy: Never # Use local image from Kind
+
+          env:
+            # Worker identification (from Job index)
+            - name: WORKER_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.annotations['batch.kubernetes.io/job-completion-index']
+
+            # Pod information for logging
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+
+            # ═══════════════════════════════════════════════════════════════════
+            # QUEUE MODE CONFIGURATION (enabled)
+            # ═══════════════════════════════════════════════════════════════════
+            - name: USE_QUEUE
+              value: "true"
+
+            # Redis connection
+            - name: REDIS_HOST
+              value: "ttg-redis"
+            - name: REDIS_PORT
+              value: "6379"
+
+            # ═══════════════════════════════════════════════════════════════════
+            # FAULT TOLERANCE TEST CONFIGURATION
+            # ═══════════════════════════════════════════════════════════════════
+            # More params = more time to test
+            - name: TOTAL_PARAMETERS
+              value: "20000"
+
+            # Same chunk size = 200 chunks total
+            - name: CHUNK_SIZE
+              value: "100"
+
+            # SLOWER processing = more time to kill workers mid-task
+            # 5ms/param * 100 params/chunk = 500ms per chunk
+            # Total processing time: ~200 chunks * 0.5s = ~100 seconds
+            - name: SIMULATE_WORK_MS
+              value: "5"
+
+            # Shorter idle timeout for faster test completion
+            - name: IDLE_TIMEOUT_SECONDS
+              value: "45"
+
+            # Logging
+            - name: LOG_LEVEL
+              value: "INFO"
+            - name: LOG_FORMAT
+              value: "text"
+
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"

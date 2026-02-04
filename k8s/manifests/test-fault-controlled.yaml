@@ -1,0 +1,106 @@
+# Controlled Fault Tolerance Test
+# 10 chunks, 500ms/param (25s per chunk), 10s stale threshold
+# This gives plenty of time to kill a worker mid-processing
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ttg-test-0
+  labels:
+    ttg.io/mode: fault-test
+spec:
+  restartPolicy: Never
+  containers:
+    - name: worker
+      image: ttg-worker:v1.2.1
+      imagePullPolicy: Never
+      env:
+        - name: WORKER_ID
+          value: "0"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: REDIS_HOST
+          value: "ttg-redis"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: USE_QUEUE
+          value: "true"
+        - name: QUEUE_STREAM
+          value: "ttg:tasks"
+        - name: RESULTS_STREAM
+          value: "ttg:results"
+        - name: CONSUMER_GROUP
+          value: "ttg-workers"
+        - name: TOTAL_PARAMETERS
+          value: "500"
+        - name: CHUNK_SIZE
+          value: "50"
+        - name: SIMULATE_WORK_MS
+          value: "500"
+        - name: IDLE_TIMEOUT_SECONDS
+          value: "300"
+        - name: STALE_CHECK_INTERVAL_SECONDS
+          value: "5"
+        - name: STALE_THRESHOLD_MS
+          value: "10000"
+        - name: SKIP_ENQUEUE
+          value: "false"
+        - name: DEBUG_LOGGING
+          value: "true"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ttg-test-1
+  labels:
+    ttg.io/mode: fault-test
+spec:
+  restartPolicy: Never
+  containers:
+    - name: worker
+      image: ttg-worker:v1.2.1
+      imagePullPolicy: Never
+      env:
+        - name: WORKER_ID
+          value: "1"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: HOSTNAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: REDIS_HOST
+          value: "ttg-redis"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: USE_QUEUE
+          value: "true"
+        - name: QUEUE_STREAM
+          value: "ttg:tasks"
+        - name: RESULTS_STREAM
+          value: "ttg:results"
+        - name: CONSUMER_GROUP
+          value: "ttg-workers"
+        - name: TOTAL_PARAMETERS
+          value: "500"
+        - name: CHUNK_SIZE
+          value: "50"
+        - name: SIMULATE_WORK_MS
+          value: "500"
+        - name: IDLE_TIMEOUT_SECONDS
+          value: "300"
+        - name: STALE_CHECK_INTERVAL_SECONDS
+          value: "5"
+        - name: STALE_THRESHOLD_MS
+          value: "10000"
+        - name: SKIP_ENQUEUE
+          value: "false"
+        - name: DEBUG_LOGGING
+          value: "true"

@@ -1,120 +1,126 @@
 # TTG Distributed Computation System
 
-## Supervisor Report - Milestone 1 Complete
+## Supervisor Report - Milestone 2 Complete
 
-**Report Date:** January 27, 2026  
-**Version:** 1.1.0  
-**Status:** ✅ **MILESTONE 1 COMPLETE**
+**Report Date:** February 3, 2026  
+**Version:** 1.2.1  
+**Status:** ✅ **MILESTONE 2 COMPLETE**
 
 ---
 
 ## Executive Summary
 
-We have successfully built and tested a **distributed computation system** that runs across multiple Kubernetes worker nodes. The system can process 10,000 parameters across 3 parallel workers in under 10 seconds, demonstrating linear scalability potential.
+We have successfully built and tested a **fault-tolerant distributed computation system** that runs across multiple Kubernetes worker nodes using Redis Streams for dynamic task distribution. The system processes work in parallel and automatically recovers from worker failures with zero data loss.
 
-> **Note:** The current worker runs a **simulated workload** (1ms delay per parameter) to prove the infrastructure works. The real algorithm will be integrated in a future milestone.
+### 🎉 Key Achievement: Fault Tolerance VERIFIED
 
-### Key Achievements
+| Metric               | Result                                 |
+| -------------------- | -------------------------------------- |
+| **Chunks Completed** | 100/100 (100%)                         |
+| **Workers**          | 3 parallel (standalone pods)           |
+| **Worker Killed At** | 30% progress                           |
+| **Total Time**       | 44 seconds                             |
+| **Throughput**       | 22 params/sec                          |
+| **Fault Tolerance**  | ✅ **VERIFIED** - 100% despite failure |
 
-| Metric                   | Result                             |
-| ------------------------ | ---------------------------------- |
-| **Workers**              | 3 parallel workers                 |
-| **Nodes**                | 3 dedicated Kubernetes nodes       |
-| **Processing Time**      | ~10 seconds (simulated workload)   |
-| **Throughput**           | ~1,500 params/second (combined)    |
-| **Parameters Processed** | 10,000                             |
-| **Workload Type**        | ⚠️ Simulated (1ms sleep per param) |
-| **Test Status**          | ✅ All tests passed                |
+> **Bottom Line:** Even when we killed a worker mid-processing, the remaining workers completed ALL tasks. Zero data loss.
 
 ---
 
-## Quick Start Guide
+## Quick Demo (Copy-Paste Commands)
 
-### Prerequisites
-
-- Docker Desktop (running)
-- `kubectl` CLI installed
-- `kind` CLI installed
-
-### Step 1: Create the Cluster (One-time setup)
+### Full Demo with Fault Tolerance (2-3 minutes)
 
 ```bash
 cd /home/xavierand_/Desktop/TTG
-./k8s/local/setup-local.sh
+
+# Run the complete demo
+./scripts/run-demo.sh --scale small --fault-demo --monitor cli
 ```
 
-This creates a local Kubernetes cluster with:
+This will:
 
-- 1 control plane node
-- 3 worker nodes
+1. ✅ Verify infrastructure is ready
+2. ✅ Deploy Redis and 3 workers
+3. ✅ Start 100 parameter chunks
+4. ✅ **Kill a worker at 30%** to demonstrate fault tolerance
+5. ✅ Show 100% completion despite failure
+6. ✅ Cleanup automatically
 
-**Expected output:** "✅ Cluster ready!"
+### Expected Output
 
-### Step 2: Build the Worker Image
+```
+════════════════════════════════════════════════════════════════
+                    TTG DEMO - FAULT TOLERANCE
+════════════════════════════════════════════════════════════════
 
-```bash
-./scripts/build.sh --version 1.1.0 --load-kind
+[1/7] Checking infrastructure...
+[2/7] Cleaning previous demo resources...
+[3/7] Deploying Redis (if needed)...
+[4/7] Loading tasks into queue (1000 params, 100 chunks)...
+[5/7] Deploying 3 workers...
+[6/7] Starting fault tolerance demo...
+
+⏳ Waiting for 30% completion before killing worker...
+🔪 Killing worker ttg-worker-1...
+✅ Worker killed! Watching remaining workers complete...
+
+════════════════════════════════════════════════════════════════
+                         RESULTS
+════════════════════════════════════════════════════════════════
+
+Chunks completed: 100/100
+Total time: 44s
+Throughput: 22 params/sec
+
+✅ FAULT TOLERANCE VERIFIED: 100% completion despite worker failure!
 ```
 
-This:
-
-- Builds the Python worker Docker image
-- Tags it as `ttg-worker:v1.1.0`
-- Loads it into all kind cluster nodes
-
-**Expected output:** "✓ Image loaded into kind cluster"
-
-### Step 3: Deploy Workers
+### Cleanup After Demo
 
 ```bash
-kubectl apply -f k8s/manifests/parallel-jobs.yaml
+# Preview first (safe, no changes)
+./scripts/cleanup-ttg.sh --pods --dry-run
+
+# Clean demo resources
+./scripts/cleanup-ttg.sh --pods --force
 ```
 
-**Expected output:** "job.batch/ttg-computation created"
+---
 
-### Step 4: Watch Results
+## What Changed from Milestone 1 to Milestone 2
 
-```bash
-# Watch pods being created and completing
-kubectl get pods -l app.kubernetes.io/name=ttg-worker -w
+### Milestone 1: Static Distribution
 
-# View logs (live)
-kubectl logs -l app.kubernetes.io/name=ttg-worker -f
+```
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+│  Worker 0   │  │  Worker 1   │  │  Worker 2   │
+│ Params 0-3K │  │ Params 3-6K │  │ Params 6-10K│
+└─────────────┘  └─────────────┘  └─────────────┘
+       ↓                ↓                ↓
+    Process          Process          Process
+       ↓                ↓                ↓
+    STDOUT           STDOUT           STDOUT
 
-# Check job status
-kubectl get job ttg-computation
+❌ Problem: If Worker 1 dies, params 3-6K are LOST
 ```
 
-**Expected output:** All 3 pods show "Completed" status
+### Milestone 2: Queue-Based with Fault Tolerance
 
-### Step 5: Verify Distribution
-
-```bash
-# See which node each worker ran on
-kubectl get pods -o wide
 ```
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+│  Worker 0   │  │  Worker 1   │  │  Worker 2   │
+│             │  │    ╳ DIES   │  │             │
+└──────┬──────┘  └──────┬──────┘  └──────┬──────┘
+       │                │                │
+       └────────────────┼────────────────┘
+                        │
+                  ┌─────▼─────┐
+                  │   REDIS   │
+                  │  Streams  │
+                  └───────────┘
 
-You should see each pod on a different node (worker, worker2, worker3).
-
-### Step 6: View Resources
-
-```bash
-./scripts/list-resources.sh
-```
-
-Shows all TTG-related Docker and Kubernetes resources.
-
-### Step 7: Clean Up
-
-```bash
-# Preview what will be deleted
-./scripts/cleanup-all.sh --dry-run
-
-# Actually delete everything
-./scripts/cleanup-all.sh --force
-
-# Or keep the cluster for next run
-./scripts/cleanup-all.sh --keep-cluster
+✅ Solution: Worker 0 & 2 continue. Stale tasks reclaimed.
 ```
 
 ---
@@ -123,169 +129,172 @@ Shows all TTG-related Docker and Kubernetes resources.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                         KIND KUBERNETES CLUSTER                          │
+│                      KIND KUBERNETES CLUSTER                             │
+│                        (kind-ttg-sandbox)                                │
+├─────────────────────────────────────────────────────────────────────────┤
 │                                                                          │
-│  ┌─────────────────────────────────────────────────────────────────┐    │
-│  │                    CONTROL PLANE NODE                            │    │
-│  │              (ttg-cluster-control-plane)                         │    │
-│  │      ┌──────────────┬──────────────┬──────────────┐             │    │
-│  │      │  API Server  │  Scheduler   │  Controller  │             │    │
-│  │      └──────────────┴──────────────┴──────────────┘             │    │
-│  └─────────────────────────────────────────────────────────────────┘    │
-│                                │                                         │
-│                                ▼                                         │
-│  ┌───────────────────┐  ┌───────────────────┐  ┌───────────────────┐   │
-│  │  WORKER NODE 1    │  │  WORKER NODE 2    │  │  WORKER NODE 3    │   │
-│  │  (ttg-cluster-    │  │  (ttg-cluster-    │  │  (ttg-cluster-    │   │
-│  │   worker)         │  │   worker2)        │  │   worker3)        │   │
-│  │                   │  │                   │  │                   │   │
-│  │  ┌─────────────┐  │  │  ┌─────────────┐  │  │  ┌─────────────┐  │   │
-│  │  │ TTG Worker  │  │  │  │ TTG Worker  │  │  │  │ TTG Worker  │  │   │
-│  │  │ Pod #0      │  │  │  │ Pod #1      │  │  │  │ Pod #2      │  │   │
-│  │  │             │  │  │  │             │  │  │  │             │  │   │
-│  │  │ Params:     │  │  │  │ Params:     │  │  │  │ Params:     │  │   │
-│  │  │ 0-3332      │  │  │  │ 3333-6665   │  │  │  │ 6666-9999   │  │   │
-│  │  └─────────────┘  │  │  └─────────────┘  │  │  └─────────────┘  │   │
-│  └───────────────────┘  └───────────────────┘  └───────────────────┘   │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                  │
+│  │  Worker Pod  │  │  Worker Pod  │  │  Worker Pod  │                  │
+│  │   (ttg-0)    │  │   (ttg-1)    │  │   (ttg-2)    │                  │
+│  │ v1.2.1       │  │ v1.2.1       │  │ v1.2.1       │                  │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘                  │
+│         │                 │                 │                           │
+│         │   XREADGROUP    │   XREADGROUP    │   (Pull tasks)           │
+│         │   XACK          │   XACK          │   (Acknowledge)          │
+│         └─────────────────┼─────────────────┘                           │
+│                           │                                              │
+│                     ┌─────▼─────┐                                        │
+│                     │   REDIS   │                                        │
+│                     │ ttg-redis │                                        │
+│                     │           │                                        │
+│                     │ • ttg:tasks (100 chunks)                          │
+│                     │ • ttg:results (100 results)                       │
+│                     │ • Consumer Group: ttg-workers                     │
+│                     └───────────┘                                        │
+│                                                                          │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-### How It Works
-
-1. **Job Creation**: Kubernetes creates a Job with `completions: 3` and `parallelism: 3`
-2. **Pod Scheduling**: The scheduler distributes pods across nodes using anti-affinity rules
-3. **Work Division**: Each worker calculates its parameter range based on `WORKER_ID` and `TOTAL_WORKERS`
-4. **Parallel Execution**: All 3 workers process their slice simultaneously
-5. **Completion**: Kubernetes marks the job complete when all pods finish
-
----
-
-## What Each Worker Computes (Current Implementation)
-
-> ⚠️ **Important:** The current computation is a **PLACEHOLDER/SIMULATION** to prove the infrastructure works. The real algorithm will be integrated in a future milestone.
-
-### The Computation Code
-
-**File:** `src/worker.py`  
-**Method:** `_compute_parameter()` (lines 170-198)
-
-```python
-def _compute_parameter(self, param_id: int) -> Dict[str, Any]:
-    """
-    Process a single parameter and return the result.
-
-    This is a PLACEHOLDER computation. Replace with your actual algorithm.
-    """
-    # 1. SIMULATED DELAY: Sleep for 1 millisecond per parameter
-    if self.simulate_work_ms > 0:
-        time.sleep(self.simulate_work_ms / 1000.0)  # Default: 1ms
-
-    # 2. PLACEHOLDER COMPUTATION: Generate a hash and fake result
-    input_string = f"param_{param_id}_worker_{self.worker_id}"
-    hash_result = hashlib.sha256(input_string.encode()).hexdigest()[:16]
-
-    # 3. FAKE NUMERICAL RESULT: Simple formula for demonstration
-    numerical_result = (param_id * 7 + 13) % 1000 + float(f"0.{param_id % 100}")
-
-    return {
-        'param_id': param_id,
-        'result': numerical_result,
-        'hash': hash_result,
-        'worker_id': self.worker_id,
-        'timestamp': datetime.now(timezone.utc).isoformat()
-    }
-```
-
-### Why It Takes ~10 Seconds
-
-| Step                           | Calculation                   |
-| ------------------------------ | ----------------------------- |
-| Total parameters               | 10,000                        |
-| Workers                        | 3 (parallel)                  |
-| Parameters per worker          | ~3,333                        |
-| Simulated delay per param      | 1 millisecond                 |
-| Pure sleep time per worker     | 3,333 × 1ms = **3.3 seconds** |
-| Overhead (logging, hashing)    | ~3 seconds                    |
-| **Total per worker**           | **~6.7 seconds**              |
-| **Wall-clock time (parallel)** | **~10 seconds**               |
-
-### What Milestone 1 Proves
-
-| ✅ Proven                     | ❌ Not Yet Implemented |
-| ----------------------------- | ---------------------- |
-| Work distributes across nodes | Real algorithm         |
-| Parallel execution works      | Result aggregation     |
-| Kubernetes scheduling works   | Persistent storage     |
-| Logging and monitoring works  | Error recovery         |
-| Build/deploy pipeline works   | Auto-scaling           |
-
-### To Replace With Real Algorithm
-
-Edit `src/worker.py`, find the `_compute_parameter` method, and replace the placeholder:
-
-```python
-def _compute_parameter(self, param_id: int) -> Dict[str, Any]:
-    # REMOVE: time.sleep simulation
-    # REMOVE: hash placeholder
-
-    # ADD YOUR REAL ALGORITHM HERE:
-    result = your_actual_algorithm(param_id)
-
-    return {
-        'param_id': param_id,
-        'result': result,
-        'worker_id': self.worker_id,
-        'timestamp': datetime.now(timezone.utc).isoformat()
-    }
-```
-
----
-
 ### Key Components
 
-| Component    | File                               | Purpose                           |
-| ------------ | ---------------------------------- | --------------------------------- |
-| Worker Code  | `src/worker.py`                    | Python computation logic          |
-| Logging      | `src/logging_config.py`            | Structured logging infrastructure |
-| Docker Image | `docker/Dockerfile`                | Multi-stage build, OCI labels     |
-| K8s Manifest | `k8s/manifests/parallel-jobs.yaml` | Parallel job definition           |
-| Build Script | `scripts/build.sh`                 | Versioned image building          |
-| Cleanup      | `scripts/cleanup-all.sh`           | Resource management               |
+| Component           | Purpose                                   |
+| ------------------- | ----------------------------------------- |
+| **Worker Pods**     | Process parameter chunks from Redis queue |
+| **Redis Streams**   | Task queue + result storage               |
+| **Consumer Groups** | Coordinate which worker gets which task   |
+| **XCLAIM Recovery** | Reclaim stale tasks from dead workers     |
+| **Standalone Pods** | Independent workers (not Job-managed)     |
 
 ---
 
 ## Test Results Summary
 
-### Latest Test Run: January 27, 2026
+### Fault Tolerance Test (Final - Feb 3, 2026)
 
-| Aspect           | Result  | Details                                          |
-| ---------------- | ------- | ------------------------------------------------ |
-| **Build**        | ✅ Pass | Image `ttg-worker:v1.1.0` built with OCI labels  |
-| **Distribution** | ✅ Pass | Pod 0 → worker2, Pod 1 → worker, Pod 2 → worker3 |
-| **Execution**    | ✅ Pass | 3/3 completions in 10 seconds                    |
-| **Logging**      | ✅ Pass | Structured logs with lifecycle events            |
-| **Cleanup**      | ✅ Pass | Scripts work with dry-run mode                   |
+| Metric          | Value                              |
+| --------------- | ---------------------------------- |
+| Configuration   | 3 workers, 1000 params, 100 chunks |
+| Worker Killed   | At 30% progress                    |
+| Final Result    | **100/100 chunks completed**       |
+| Completion Time | 44 seconds                         |
+| Throughput      | 22 params/sec                      |
+| Data Loss       | **ZERO**                           |
 
-### Worker Performance
+### Full Scale Test (10K params)
 
-| Worker | Node    | Params | Duration | Throughput |
-| ------ | ------- | ------ | -------- | ---------- |
-| 0      | worker2 | 3,333  | 6.67s    | 499 p/s    |
-| 1      | worker  | 3,334  | 6.68s    | 499 p/s    |
-| 2      | worker3 | 3,333  | 6.67s    | 499 p/s    |
+| Metric          | Value                 |
+| --------------- | --------------------- |
+| Parameters      | 10,000                |
+| Workers         | 3                     |
+| Chunks          | 100 (100 params each) |
+| Wall Clock Time | ~8 seconds            |
+| Throughput      | 1,276 params/sec      |
+| Success Rate    | 100%                  |
 
-**Total effective throughput: ~1,500 parameters/second**
+---
 
-### Sample Log Output
+## Key Scripts Created
 
+### 1. Demo Script (`scripts/run-demo.sh`)
+
+Full-featured demonstration with fault injection:
+
+```bash
+# Basic demo
+./scripts/run-demo.sh
+
+# Fault tolerance demo (RECOMMENDED for supervisor)
+./scripts/run-demo.sh --scale small --fault-demo --monitor cli
+
+# With visual monitoring (RedisInsight)
+./scripts/run-demo.sh --scale small --fault-demo --monitor both
 ```
-[2026-01-27 05:20:48.396] [INFO ] [WORKER-0] [worker] 🚀 LIFECYCLE: STARTING
-[2026-01-27 05:20:48.396] [INFO ] [WORKER-0] [worker] ✅ LIFECYCLE: INITIALIZED
-[2026-01-27 05:20:48.396] [INFO ] [WORKER-0] [worker] ▶️  LIFECYCLE: RUNNING - Processing 3333 items
-[2026-01-27 05:20:49.397] [INFO ] [WORKER-0] [worker] 📊 LIFECYCLE: PROGRESS - 500/3333 (15.0%)
-...
-[2026-01-27 05:20:55.071] [INFO ] [WORKER-0] [worker] 🎉 LIFECYCLE: COMPLETED - Duration: 6.67s
+
+### 2. Cleanup Script (`scripts/cleanup-ttg.sh`)
+
+Safe cleanup with protected resources:
+
+```bash
+# Preview first (safe, no changes)
+./scripts/cleanup-ttg.sh --all --dry-run
+
+# Clean pods only
+./scripts/cleanup-ttg.sh --pods --force
+
+# Full cleanup
+./scripts/cleanup-ttg.sh --all --force
+
+# Protected resources (NEVER deleted):
+#   ✓ MongoDB containers (local2874)
+#   ✓ System containers
+#   ✓ Non-TTG resources
 ```
+
+### 3. Recovery Script (`scripts/recover-infra.sh`)
+
+Recover infrastructure after system restart:
+
+```bash
+./scripts/recover-infra.sh
+```
+
+---
+
+## Milestone 2 Deliverables
+
+| Deliverable               | Status      | Location                            |
+| ------------------------- | ----------- | ----------------------------------- |
+| Redis Streams Integration | ✅ Complete | `src/queue_utils.py`                |
+| Queue Mode Worker         | ✅ Complete | `src/worker.py` (QueueWorker class) |
+| Consumer Groups           | ✅ Complete | XREADGROUP + XACK pattern           |
+| Fault Tolerance           | ✅ Complete | Standalone pods + XCLAIM            |
+| Demo Script               | ✅ Complete | `scripts/run-demo.sh`               |
+| Cleanup Script            | ✅ Complete | `scripts/cleanup-ttg.sh`            |
+| Recovery Script           | ✅ Complete | `scripts/recover-infra.sh`          |
+| Documentation             | ✅ Complete | All docs updated                    |
+
+---
+
+## Technical Details
+
+### Why Standalone Pods Instead of Jobs?
+
+**Key Discovery:** Kubernetes Job controller with `backoffLimit: 0` terminates ALL pods when one fails (`BackoffLimitExceeded`). For fault tolerance:
+
+```yaml
+# ✅ GOOD: Standalone pods (workers independent)
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ttg-worker-0
+spec:
+  restartPolicy: Never
+
+# ❌ BAD for fault demos: Job controller
+apiVersion: batch/v1
+kind: Job
+spec:
+  backoffLimit: 0  # Kills ALL pods on any failure!
+```
+
+### Redis Streams Commands Used
+
+| Command      | Purpose                              |
+| ------------ | ------------------------------------ |
+| `XADD`       | Add task to queue                    |
+| `XREADGROUP` | Pull task (delivers to one consumer) |
+| `XACK`       | Acknowledge task complete            |
+| `XCLAIM`     | Reclaim stale task from dead worker  |
+| `XPENDING`   | Check pending (unacknowledged) tasks |
+| `XLEN`       | Count items in stream                |
+
+### Fault Recovery Timing
+
+| Setting              | Value | Purpose                             |
+| -------------------- | ----- | ----------------------------------- |
+| Stale Check Interval | 30s   | How often to check for stale tasks  |
+| Stale Threshold      | 60s   | When task considered abandoned      |
+| Idle Timeout         | 30s   | Worker exits after no tasks for 30s |
 
 ---
 
@@ -293,393 +302,70 @@ def _compute_parameter(self, param_id: int) -> Dict[str, Any]:
 
 ```
 TTG/
-├── src/                          # Source code
-│   ├── worker.py                 # Main distributed worker
-│   └── logging_config.py         # Logging infrastructure
+├── src/
+│   ├── worker.py           # Main worker (v1.2.1)
+│   ├── queue_utils.py      # Redis Streams wrapper
+│   └── logging_config.py   # Structured logging
 │
-├── docker/
-│   └── Dockerfile                # Multi-stage build with OCI labels
-│
-├── k8s/
-│   ├── manifests/
-│   │   └── parallel-jobs.yaml    # Main deployment manifest
-│   └── local/
-│       ├── kind-config.yaml      # Kind cluster configuration
-│       └── setup-local.sh        # Cluster setup script
+├── k8s/manifests/
+│   ├── redis.yaml                       # Redis deployment
+│   └── parallel-workers-standalone.yaml # Queue mode workers
 │
 ├── scripts/
-│   ├── build.sh                  # Versioned image building
-│   ├── list-resources.sh         # Resource inventory
-│   └── cleanup-all.sh            # Comprehensive cleanup
+│   ├── run-demo.sh         # Full demo script
+│   ├── cleanup-ttg.sh      # Safe cleanup
+│   ├── recover-infra.sh    # Infrastructure recovery
+│   └── aggregate_results.py # Results aggregation
 │
-├── docs/                         # Documentation
-│   ├── KIND_EXPLAINED.md         # Kind tutorial for beginners
-│   ├── KUBERNETES_EXPLAINED.md   # K8s concepts explained
-│   ├── CONFIGURATION_GUIDE.md    # Configuration reference
-│   └── TEST_RESULTS_v1.1.0.md    # Detailed test results
+├── docs/
+│   ├── README.md                        # Docs navigation index
+│   ├── architecture/                    # System design
+│   │   └── M2_QUEUE_ARCHITECTURE.md
+│   ├── guides/                          # Operational guides
+│   │   ├── QUEUE_MODE_GUIDE.md
+│   │   └── CONFIGURATION_GUIDE.md
+│   ├── results/                         # Test results
+│   │   ├── TEST_RESULTS_M2_FAULT_TOLERANCE.md
+│   │   └── TEST_RESULTS_M1_PARALLEL_JOBS.md
+│   ├── setup/                           # Installation
+│   │   ├── KUBERNETES_SETUP.md
+│   │   └── AZURE_AKS_GUIDE.md
+│   ├── knowledge/                       # Tutorials
+│   │   ├── KUBERNETES_EXPLAINED.md
+│   │   └── KIND_EXPLAINED.md
+│   └── tracking/                        # Project status
+│       ├── PROJECT_TRACKER.md
+│       └── PROJECT_OVERVIEW.md
 │
-├── README.md                     # Project readme
-└── SUPERVISOR_REPORT.md          # This document
-```
-
-### Files That Can Be Removed (Deprecated)
-
-| File                 | Reason                                   | Action         |
-| -------------------- | ---------------------------------------- | -------------- |
-| `scripts/cleanup.sh` | Replaced by `cleanup-all.sh`             | Safe to delete |
-| `src/utils.py`       | Not used (functions inline in worker.py) | Safe to delete |
-
----
-
-## What Changed in v1.1.0
-
-### Enhanced Logging
-
-- Structured timestamps: `[YYYY-MM-DD HH:MM:SS.mmm]`
-- Worker identification: `[WORKER-N]`
-- Lifecycle events with emojis: 🚀 STARTING, ✅ INITIALIZED, ▶️ RUNNING, 📊 PROGRESS, 🎉 COMPLETED
-- JSON summary output for machine parsing
-- Performance metrics (throughput, batch timing)
-
-### Docker Improvements
-
-- OCI-compliant image labels for traceability
-- Version, build date, git commit embedded
-- Custom `ttg.*` labels for filtering
-
-### Kubernetes Improvements
-
-- Standard `app.kubernetes.io/*` labels
-- Custom `ttg.io/*` labels
-- Monitoring annotations
-- Enhanced pod naming
-
-### New Scripts
-
-- `build.sh` - Versioned builds with kind integration
-- `list-resources.sh` - Complete resource inventory
-- `cleanup-all.sh` - Safe cleanup with dry-run mode
-
----
-
-## Scaling Considerations (Future Milestones)
-
-### To Increase Workers
-
-Edit `k8s/manifests/parallel-jobs.yaml`:
-
-```yaml
-spec:
-  completions: 10 # Change from 3 to 10
-  parallelism: 10 # Match completions
-  # ...
-  env:
-    - name: TOTAL_WORKERS
-      value: "10" # Must match completions
-```
-
-### To Increase Parameters
-
-Edit the same file:
-
-```yaml
-env:
-  - name: TOTAL_PARAMETERS
-    value: "1000000" # 1 million parameters
-```
-
-### Estimated Scaling
-
-| Workers | Parameters | Est. Time | Notes                        |
-| ------- | ---------- | --------- | ---------------------------- |
-| 3       | 10,000     | 10s       | Current (tested)             |
-| 10      | 100,000    | ~30s      | Need 10 nodes                |
-| 100     | 1,000,000  | ~30s      | Need 100 nodes (Azure AKS)   |
-| 1,000   | 10,000,000 | ~30s      | Production scale (Azure AKS) |
-
----
-
-## Next Steps
-
-### ✅ Milestone 2: Message Queue Architecture (2-WEEK SPRINT)
-
-> **Full details:** [docs/MILESTONE_2_MESSAGE_QUEUE.md](docs/MILESTONE_2_MESSAGE_QUEUE.md)
-
-**Chosen Solution:** Redis Streams  
-**Timeline:** 2 weeks (10 working days)  
-**Target Completion:** February 13, 2026  
-**Status:** 🚀 Ready to start
-
-```
-Week 1: Core Implementation          Week 2: Testing & Documentation
-═══════════════════════════          ═══════════════════════════════
-Day 1-2: Redis + queue_utils.py      Day 6-7: Fault & Scale testing
-Day 3-4: Worker integration          Day 8-9: Documentation update
-Day 5:   Kind E2E test (10K)         Day 10:  Buffer / Demo
-```
-
-**Key Simplifications for 2-Week Delivery:**
-
-- No separate Coordinator (Worker 0 initializes tasks)
-- No separate Aggregator (query Redis manually)
-- No Celery (pure Redis Streams)
-- Feature toggle for safe rollback
-
-**MVP Success Criteria:**
-
-- [ ] Redis deployed in kind cluster
-- [ ] Workers pull tasks dynamically from queue
-- [ ] Fault tolerance proven (kill pod → task reprocessed)
-- [ ] 10K and 100K parameter tests pass
-- [ ] Documentation updated
-
-### Deferred to Future Phase
-
-- [ ] Celery integration (2 weeks)
-- [ ] Flower monitoring dashboard
-- [ ] Persistent Redis storage
-- [ ] Azure AKS deployment
-- [ ] Real algorithm integration
-
----
-
-## Contact & Support
-
-**Documentation:**
-
-- **Milestone 2 Plan:** [docs/MILESTONE_2_MESSAGE_QUEUE.md](docs/MILESTONE_2_MESSAGE_QUEUE.md) ⬅️ NEW
-- Kind guide: [docs/KIND_EXPLAINED.md](docs/KIND_EXPLAINED.md)
-- K8s concepts: [docs/KUBERNETES_EXPLAINED.md](docs/KUBERNETES_EXPLAINED.md)
-- Configuration: [docs/CONFIGURATION_GUIDE.md](docs/CONFIGURATION_GUIDE.md)
-
-**Useful Commands:**
-
-```bash
-# Check cluster health
-kubectl get nodes
-
-# View all TTG resources
-./scripts/list-resources.sh
-
-# View logs in real-time
-kubectl logs -l app.kubernetes.io/name=ttg-worker -f
-
-# Get detailed pod info
-kubectl describe pod <pod-name>
+├── SUPERVISOR_REPORT.md    # This document
+└── README.md               # Project readme
 ```
 
 ---
 
-## 🎬 Demo for Supervisor (Copy-Paste Commands)
+## Next Steps (Milestone 3 - Future)
 
-### Quick Reference Card
-
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                    SUPERVISOR DEMO - QUICK COMMANDS                         │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  FULL DEMO (from scratch):     ./scripts/demo-full.sh                      │
-│                                  OR copy commands below                     │
-│                                                                             │
-│  RE-RUN DEMO (cluster exists): kubectl delete job ttg-computation          │
-│                                kubectl apply -f k8s/manifests/parallel-... │
-│                                                                             │
-│  CLEANUP (TTG only):           ./scripts/cleanup-all.sh --keep-cluster     │
-│  CLEANUP (everything):         ./scripts/cleanup-all.sh --force            │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-```
+| Task                       | Priority | Notes                          |
+| -------------------------- | -------- | ------------------------------ |
+| Azure AKS Deployment       | High     | Production environment         |
+| Persistent Redis Storage   | Medium   | For production data durability |
+| Real Algorithm Integration | High     | Replace placeholder            |
+| Monitoring Dashboard       | Medium   | Grafana + Prometheus           |
+| Auto-scaling               | Low      | HPA for workers                |
 
 ---
 
-### Option A: Full Demo from Scratch (~5 minutes)
+## Contact & Documentation
 
-Copy and paste these commands one by one:
-
-```bash
-# ═══════════════════════════════════════════════════════════════════════════
-# STEP 1: Navigate to project
-# ═══════════════════════════════════════════════════════════════════════════
-cd /home/xavierand_/Desktop/TTG
-
-# ═══════════════════════════════════════════════════════════════════════════
-# STEP 2: Create Kubernetes cluster (1-2 minutes)
-# Creates: 1 control-plane + 3 worker nodes
-# ═══════════════════════════════════════════════════════════════════════════
-./k8s/local/setup-local.sh
-
-# ═══════════════════════════════════════════════════════════════════════════
-# STEP 3: Build Docker image and load to cluster
-# ═══════════════════════════════════════════════════════════════════════════
-./scripts/build.sh --version 1.1.0 --load-kind
-
-# ═══════════════════════════════════════════════════════════════════════════
-# STEP 4: Deploy the workers (3 parallel workers)
-# ═══════════════════════════════════════════════════════════════════════════
-kubectl apply -f k8s/manifests/parallel-jobs.yaml
-
-# ═══════════════════════════════════════════════════════════════════════════
-# STEP 5: Watch pods being created and completing (~10 seconds)
-# Press Ctrl+C when all show "Completed"
-# ═══════════════════════════════════════════════════════════════════════════
-kubectl get pods -l app.kubernetes.io/name=ttg-worker -w
-
-# ═══════════════════════════════════════════════════════════════════════════
-# STEP 6: Show distribution across nodes (THE KEY RESULT!)
-# Each pod should be on a DIFFERENT node
-# ═══════════════════════════════════════════════════════════════════════════
-kubectl get pods -o wide
-
-# ═══════════════════════════════════════════════════════════════════════════
-# STEP 7: View logs (shows processing output)
-# ═══════════════════════════════════════════════════════════════════════════
-kubectl logs -l app.kubernetes.io/name=ttg-worker --tail=20
-
-# ═══════════════════════════════════════════════════════════════════════════
-# STEP 8: Show job completion status
-# Should show: COMPLETIONS 3/3
-# ═══════════════════════════════════════════════════════════════════════════
-kubectl get job ttg-computation
-```
+| Document                                                                       | Description                  |
+| ------------------------------------------------------------------------------ | ---------------------------- |
+| [README.md](README.md)                                                         | Quick start guide            |
+| [docs/guides/QUEUE_MODE_GUIDE.md](docs/guides/QUEUE_MODE_GUIDE.md)             | Milestone 2 technical guide  |
+| [docs/results/TEST_RESULTS_M2_FAULT_TOLERANCE.md](docs/results/TEST_RESULTS_M2_FAULT_TOLERANCE.md) | Fault tolerance test results |
+| [docs/tracking/PROJECT_TRACKER.md](docs/tracking/PROJECT_TRACKER.md)           | Milestone tracking           |
 
 ---
 
-### Option B: Quick Re-Demo (~2 minutes)
-
-If cluster already exists from previous run:
-
-```bash
-cd /home/xavierand_/Desktop/TTG
-
-# Delete previous job (if exists)
-kubectl delete job ttg-computation --ignore-not-found=true
-
-# Re-deploy workers
-kubectl apply -f k8s/manifests/parallel-jobs.yaml
-
-# Watch completion
-kubectl get pods -l app.kubernetes.io/name=ttg-worker -w
-
-# Show results
-kubectl get pods -o wide
-kubectl get job ttg-computation
-```
-
----
-
-### What to Show Supervisor
-
-| Step                  | What to Point Out                                              |
-| --------------------- | -------------------------------------------------------------- |
-| **Pods starting**     | "3 pods starting simultaneously"                               |
-| **Node distribution** | "Each pod runs on a different node (worker, worker2, worker3)" |
-| **Completion**        | "All 3 completed in ~10 seconds"                               |
-| **Logs**              | "Each worker processed ~3,333 parameters independently"        |
-
----
-
-### 🧹 Cleanup Commands (SAFE - Only Deletes TTG Resources)
-
-```bash
-# ═══════════════════════════════════════════════════════════════════════════
-# OPTION 1: Delete job only (fastest, can re-demo immediately)
-# ═══════════════════════════════════════════════════════════════════════════
-kubectl delete job ttg-computation
-
-# ═══════════════════════════════════════════════════════════════════════════
-# OPTION 2: Delete job + pods, keep cluster (good for re-demo later)
-# ═══════════════════════════════════════════════════════════════════════════
-./scripts/cleanup-all.sh --keep-cluster --force
-
-# ═══════════════════════════════════════════════════════════════════════════
-# OPTION 3: Full cleanup - delete everything TTG-related
-# (cluster, images, containers - BUT NOT other Docker resources)
-# ═══════════════════════════════════════════════════════════════════════════
-./scripts/cleanup-all.sh --force
-
-# ═══════════════════════════════════════════════════════════════════════════
-# OPTION 4: Preview what will be deleted (dry-run, no actual deletion)
-# ═══════════════════════════════════════════════════════════════════════════
-./scripts/cleanup-all.sh --dry-run
-```
-
-**⚠️ SAFETY NOTE:** The cleanup script ONLY deletes TTG project resources:
-
-- Kubernetes: Jobs/pods with label `app.kubernetes.io/name=ttg-worker`
-- Kind cluster: `ttg-cluster` only
-- Docker images: `ttg-worker:*` only
-
-**Your other Docker containers, images, and resources are SAFE.**
-
----
-
-## Appendix: Complete Command Reference
-
-### Build Commands
-
-```bash
-# Standard build
-./scripts/build.sh
-
-# Build with specific version
-./scripts/build.sh --version 1.1.0
-
-# Build and load into kind
-./scripts/build.sh --version 1.1.0 --load-kind
-```
-
-### Deploy Commands
-
-```bash
-# Deploy parallel job
-kubectl apply -f k8s/manifests/parallel-jobs.yaml
-
-# Delete job (to redeploy)
-kubectl delete job ttg-computation
-
-# Scale (edit manifest, then apply)
-kubectl apply -f k8s/manifests/parallel-jobs.yaml
-```
-
-### Monitoring Commands
-
-```bash
-# Watch pods
-kubectl get pods -w
-
-# View logs (all workers)
-kubectl logs -l app.kubernetes.io/name=ttg-worker
-
-# View logs (specific worker)
-kubectl logs ttg-computation-0-xxxxx
-
-# Resource usage
-kubectl top pods
-```
-
-### Cleanup Commands
-
-```bash
-# Preview cleanup
-./scripts/cleanup-all.sh --dry-run
-
-# Delete job only
-kubectl delete job ttg-computation
-
-# Full cleanup
-./scripts/cleanup-all.sh --force
-
-# Cleanup but keep cluster
-./scripts/cleanup-all.sh --keep-cluster
-
-# Delete entire cluster
-kind delete cluster --name ttg-cluster
-```
-
----
-
-**Report Generated:** 2026-01-27 00:21 EST  
-**Last Updated:** 2026-01-30  
-**Version:** 1.1.0  
-**Status:** Milestone 1 Complete ✅ | Milestone 2 Sprint Starting 🚀
+**Report Generated:** February 3, 2026  
+**Version:** 1.2.1  
+**Status:** Milestone 2 Complete ✅ | Ready for Milestone 3 🚀
