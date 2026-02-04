@@ -1,7 +1,7 @@
 # TTG Queue Mode Guide (Milestone 2)
 
-**Version:** 1.2.0  
-**Status:** ✅ Implemented  
+**Version:** 1.2.1  
+**Status:** ✅ Implemented with Fault Tolerance  
 **Date:** February 2026
 
 ---
@@ -14,9 +14,10 @@
 4. [Configuration Reference](#configuration-reference)
 5. [Running Queue Mode](#running-queue-mode)
 6. [Monitoring & Observability](#monitoring--observability)
-7. [Troubleshooting](#troubleshooting)
-8. [API Reference](#api-reference)
-9. [FAQ](#faq)
+7. [Fault Tolerance](#fault-tolerance) ⭐ NEW
+8. [Troubleshooting](#troubleshooting)
+9. [API Reference](#api-reference)
+10. [FAQ](#faq)
 
 ---
 
@@ -491,6 +492,140 @@ worker = QueueWorker(
 result = worker.run()
 # Returns: {'status': 'completed', 'chunks_processed': 40, ...}
 ```
+
+---
+
+## Fault Tolerance
+
+### Overview
+
+Version 1.2.1 introduces **automatic fault tolerance** using Redis Streams' XCLAIM mechanism. When a worker crashes mid-processing, its pending tasks are automatically recovered by surviving workers.
+
+### How It Works
+
+1. **Task Tracking**: Every task claimed by a worker is added to Redis's Pending Entry List (PEL)
+2. **Stale Detection**: Workers periodically check for tasks that have been pending "too long"
+3. **Automatic Recovery**: Stale tasks are claimed using XCLAIM and processed by the claiming worker
+4. **At-Least-Once Delivery**: Tasks are only removed from PEL after acknowledgment
+
+### Key Configuration
+
+| Environment Variable           | Default | Description                                                   |
+| ------------------------------ | ------- | ------------------------------------------------------------- |
+| `STALE_CHECK_INTERVAL_SECONDS` | 30      | How often workers check for stale tasks                       |
+| `STALE_THRESHOLD_MS`           | 60000   | Tasks pending longer than this are considered stale           |
+| `IDLE_TIMEOUT_SECONDS`         | 30      | How long to wait before exiting (should be > stale threshold) |
+
+### Fault Recovery Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        FAULT RECOVERY FLOW                               │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  Time 0s: Worker-2 claims task chunk_42                                  │
+│           ├─ PEL: {chunk_42: worker-2, idle: 0s}                        │
+│                                                                          │
+│  Time 5s: Worker-2 CRASHES (killed, OOM, network failure)                │
+│           ├─ PEL: {chunk_42: worker-2, idle: 5s}                        │
+│           └─ Task still in PEL, NOT acknowledged                        │
+│                                                                          │
+│  Time 35s: Worker-0 runs stale check (interval=30s)                     │
+│            ├─ Finds chunk_42 with idle=35s > threshold=30s              │
+│            ├─ XCLAIM chunk_42 from worker-2 to worker-0                 │
+│            └─ PEL: {chunk_42: worker-0, idle: 0s}                       │
+│                                                                          │
+│  Time 36s: Worker-0 processes chunk_42                                   │
+│            ├─ Computes result                                           │
+│            ├─ XACK chunk_42 (removes from PEL)                          │
+│            └─ XADD result to ttg:results                                │
+│                                                                          │
+│  Result: Zero data loss despite worker crash!                            │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Running the Fault Tolerance Demo
+
+A demo script is provided to demonstrate fault recovery:
+
+```bash
+# Run the interactive demo
+./scripts/fault-tolerance-demo.sh
+```
+
+The demo will:
+
+1. Deploy a slow job with 3 workers
+2. Kill one worker mid-processing
+3. Show surviving workers recovering stale tasks
+4. Verify all data was processed
+
+### Manual Fault Tolerance Test
+
+```bash
+# Step 1: Deploy fault test job
+kubectl apply -f k8s/manifests/parallel-jobs-fault-demo.yaml
+
+# Step 2: Watch workers start
+kubectl get pods -l ttg.io/mode=fault-demo -w
+
+# Step 3: Monitor progress (in another terminal)
+watch -n2 'kubectl exec ttg-redis -- redis-cli XLEN ttg:results'
+
+# Step 4: Kill a worker mid-processing
+kubectl delete pod ttg-fault-demo-0-xxxxx --force --grace-period=0
+
+# Step 5: Check pending tasks (should have orphaned task from killed worker)
+kubectl exec ttg-redis -- redis-cli XPENDING ttg:tasks ttg-workers
+
+# Step 6: Wait 30-60 seconds for recovery
+# Another worker will claim the stale task
+
+# Step 7: Verify all tasks completed
+kubectl exec ttg-redis -- redis-cli XLEN ttg:results
+# Should equal total chunks (e.g., 100)
+```
+
+### Viewing Recovery Logs
+
+```bash
+# Filter logs for recovery messages
+kubectl logs -l ttg.io/mode=fault-demo | grep -i "FAULT\|RECOVERY\|claimed"
+
+# Example output:
+# [2026-02-04 02:15:33] 🔄 FAULT RECOVERY: Found 1 stale tasks
+# [2026-02-04 02:15:33] 🔄 FAULT RECOVERY: Claimed chunk_42 from worker-2
+# [2026-02-04 02:15:34] 🔄 FAULT RECOVERY: Successfully processed recovered task
+```
+
+### Tuning Fault Tolerance
+
+**For Faster Recovery (Demo/Testing):**
+
+```yaml
+env:
+  - name: STALE_CHECK_INTERVAL_SECONDS
+    value: "15" # Check more frequently
+  - name: STALE_THRESHOLD_MS
+    value: "30000" # 30 seconds (faster recovery)
+```
+
+**For Production (Avoid False Positives):**
+
+```yaml
+env:
+  - name: STALE_CHECK_INTERVAL_SECONDS
+    value: "60" # Check every minute
+  - name: STALE_THRESHOLD_MS
+    value: "120000" # 2 minutes (avoid claiming active tasks)
+```
+
+### Limitations
+
+1. **At-Least-Once Delivery**: Tasks may be processed twice if a worker completes but crashes before ACK
+2. **Recovery Time**: Recovery is not instant; depends on stale check interval + threshold
+3. **Consumer Group Required**: Only works with consumer groups (XREADGROUP), not XREAD
 
 ---
 

@@ -1,0 +1,130 @@
+# TTG Fault Tolerance Demo Test - SLOW VERSION
+#
+# This is a SLOW version specifically for demonstrating fault tolerance.
+# It uses 50ms per parameter (10x slower) so you have time to kill a pod
+# and observe the automatic recovery.
+#
+# Demo Steps:
+#   1. Deploy: kubectl apply -f parallel-jobs-fault-demo.yaml
+#   2. Wait ~5s for workers to start processing
+#   3. In another terminal, watch results: watch -n2 'kubectl exec ttg-redis -- redis-cli XLEN ttg:results'
+#   4. Kill a worker: kubectl delete pod <pod-name> --force --grace-period=0
+#   5. Wait 30-60 seconds for stale task recovery
+#   6. Watch logs: kubectl logs -f ttg-fault-demo-0-xxxxx | grep -i "FAULT\|RECOVERY\|claimed"
+#   7. Observe that all tasks complete despite the crash
+#
+# Expected outcome:
+#   - 100 total chunks (1000 params / 10 chunk size)
+#   - Even if you kill a worker, all 100 chunks should complete
+#   - Recovery messages show "🔄 FAULT RECOVERY: Claimed X stale tasks"
+#
+# Timing:
+#   - Each chunk: 10 params * 50ms = 500ms + overhead ≈ 600ms per chunk
+#   - Total time: ~100 chunks / 3 workers * 600ms ≈ 20 seconds normal
+#   - With fault + recovery: add ~60s for stale threshold
+#
+# Clean up:
+#   kubectl delete job ttg-fault-demo
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ttg-fault-demo
+  labels:
+    app.kubernetes.io/name: ttg-fault-demo
+    app.kubernetes.io/component: fault-tolerance-demo
+    ttg.io/project: distributed-compute
+    ttg.io/mode: fault-demo
+spec:
+  # 3 workers - easy to observe and kill one
+  completions: 3
+  parallelism: 3
+  completionMode: Indexed
+
+  # No retries - we want to see the fault tolerance, not K8s restart
+  backoffLimit: 0
+
+  # Keep for analysis
+  ttlSecondsAfterFinished: 3600
+
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ttg-worker
+        ttg.io/mode: fault-demo
+    spec:
+      restartPolicy: Never
+
+      containers:
+        - name: worker
+          image: ttg-worker:v1.2.1
+          imagePullPolicy: Never
+
+          env:
+            - name: WORKER_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.annotations['batch.kubernetes.io/job-completion-index']
+
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+
+            # Redis connection
+            - name: REDIS_HOST
+              value: "ttg-redis"
+            - name: REDIS_PORT
+              value: "6379"
+
+            # Enable queue mode (REQUIRED for fault tolerance)
+            - name: USE_QUEUE
+              value: "true"
+
+            # Queue configuration
+            - name: QUEUE_STREAM
+              value: "ttg:tasks"
+            - name: RESULTS_STREAM
+              value: "ttg:results"
+            - name: CONSUMER_GROUP
+              value: "ttg-workers"
+
+            # SLOW workload for demo
+            - name: TOTAL_PARAMETERS
+              value: "1000" # Small: 1K params
+            - name: CHUNK_SIZE
+              value: "10" # Small chunks: 10 params each = 100 chunks
+            - name: SIMULATE_WORK_MS
+              value: "100" # SLOW: 100ms per param = 1s per chunk
+
+            # Timeout settings
+            - name: IDLE_TIMEOUT_SECONDS
+              value: "120" # 2 minutes idle timeout (enough for recovery)
+
+            # Stale task recovery settings
+            - name: STALE_CHECK_INTERVAL_SECONDS
+              value: "15" # Check every 15 seconds
+            - name: STALE_THRESHOLD_MS
+              value: "30000" # Tasks stale after 30 seconds (faster for demo)
+
+            # Other settings
+            - name: SKIP_ENQUEUE
+              value: "false"
+            - name: DEBUG_LOGGING
+              value: "true" # Extra logging for demo
+
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "300m"

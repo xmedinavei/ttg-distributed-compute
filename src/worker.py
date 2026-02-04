@@ -477,6 +477,15 @@ class QueueWorker:
         # Consumer name for Redis
         self.consumer_name = f"worker-{self.worker_id}"
 
+        # Stale task recovery settings (Fault Tolerance)
+        # - Check for stale tasks periodically
+        # - Tasks idle for threshold duration are considered stale
+        self.stale_check_interval_seconds = int(
+            os.environ.get("STALE_CHECK_INTERVAL_SECONDS", "30"))
+        self.stale_threshold_ms = int(os.environ.get(
+            "STALE_THRESHOLD_MS", "60000"))  # Default 60 seconds
+        self.last_stale_check_time = 0.0  # Will be set in _process_tasks
+
         # Log initialized
         config = {
             'worker_id': self.worker_id,
@@ -640,6 +649,85 @@ class QueueWorker:
             'interrupted': self.killer.kill_now
         }
 
+    def _check_and_claim_stale_tasks(self) -> int:
+        """
+        Check for and claim tasks that have been pending too long.
+
+        This is the core FAULT TOLERANCE feature. When a worker crashes:
+        1. Its in-progress tasks remain in Redis's Pending Entry List (PEL)
+        2. Other workers periodically check for these "stale" tasks
+        3. After the stale threshold (60s), a worker can claim and reprocess them
+        4. This ensures no work is lost, even if workers crash
+
+        How it works:
+        - Called periodically (every 30s) during the main processing loop
+        - Uses XCLAIM to transfer ownership of stale tasks
+        - Stale = idle in PEL for > stale_threshold_ms (60000ms = 60s)
+        - Each call claims up to 5 stale tasks
+
+        Returns:
+            Number of stale tasks claimed and processed
+        """
+        current_time = time.time()
+
+        # Only check every stale_check_interval_seconds
+        if current_time - self.last_stale_check_time < self.stale_check_interval_seconds:
+            return 0
+
+        self.last_stale_check_time = current_time
+
+        # Claim stale tasks
+        try:
+            claimed_tasks = self.queue.claim_stale_tasks(
+                consumer_name=self.consumer_name,
+                min_idle_ms=self.stale_threshold_ms,
+                count=5  # Claim up to 5 at a time
+            )
+
+            if not claimed_tasks:
+                return 0
+
+            self.logger.info(
+                f"🔄 FAULT RECOVERY: Claimed {len(claimed_tasks)} stale task(s) "
+                f"from crashed worker(s)"
+            )
+
+            # Process each claimed task
+            for task in claimed_tasks:
+                if self.killer.kill_now:
+                    break
+
+                previous_consumer = task.get('previous_consumer', 'unknown')
+                self.logger.warning(
+                    f"🔄 Processing recovered task {task['chunk_id']} "
+                    f"(was assigned to {previous_consumer})"
+                )
+
+                # Process the chunk
+                result = self._process_chunk(task)
+                self.chunks_processed += 1
+
+                # Publish result
+                self.queue.publish_result(
+                    chunk_id=task['chunk_id'],
+                    worker_id=self.consumer_name,
+                    result_data=result['result_summary'],
+                    duration_seconds=result['duration_seconds']
+                )
+
+                # Acknowledge
+                self.queue.ack_task(task['message_id'])
+
+                self.logger.info(
+                    f"✅ FAULT RECOVERY: Successfully recovered task {task['chunk_id']}"
+                )
+
+            return len(claimed_tasks)
+
+        except Exception as e:
+            self.logger.error(f"Error checking stale tasks: {e}")
+            return 0
+
     def _process_tasks(self) -> Dict[str, Any]:
         """
         Main loop: pull tasks, process them, publish results, acknowledge.
@@ -664,7 +752,18 @@ class QueueWorker:
             f"(idle timeout: {self.idle_timeout_seconds}s = {max_empty_reads} empty reads)"
         )
 
+        # Initialize stale check timer
+        self.last_stale_check_time = time.time()
+
         while not self.killer.kill_now:
+            # ═══════════════════════════════════════════════════════════════
+            # FAULT TOLERANCE: Check for stale tasks from crashed workers
+            # ═══════════════════════════════════════════════════════════════
+            stale_recovered = self._check_and_claim_stale_tasks()
+            if stale_recovered > 0:
+                # Reset empty counter since we did work
+                consecutive_empty = 0
+
             # Try to get next task
             task = self.queue.get_next_task(
                 consumer_name=self.consumer_name,
@@ -677,7 +776,16 @@ class QueueWorker:
                     f"No task received ({consecutive_empty}/{max_empty_reads} empty reads)"
                 )
 
+                # Before giving up, check if there are pending (stale) tasks
+                # that might need recovery from crashed workers
                 if consecutive_empty >= max_empty_reads:
+                    # Force a stale check before exiting
+                    self.last_stale_check_time = 0  # Force check now
+                    stale_recovered = self._check_and_claim_stale_tasks()
+                    if stale_recovered > 0:
+                        consecutive_empty = 0  # Keep going!
+                        continue
+
                     self.logger.info(
                         f"No tasks for {self.idle_timeout_seconds}s, assuming queue is empty"
                     )
