@@ -4,6 +4,16 @@
 
 ---
 
+## 🎯 Executive Summaries (Root Level)
+
+| Document | Description |
+|----------|-------------|
+| [SUPERVISOR_REPORT.md](../SUPERVISOR_REPORT.md) | Executive summary - quick start guide |
+| [SUPERVISOR_REPORT_M2.md](../SUPERVISOR_REPORT_M2.md) | **Milestone 2 detailed report** - architecture diagrams, demo commands, troubleshooting |
+| [README.md](../README.md) | Main project README |
+
+---
+
 ## 📚 Documentation Categories
 
 | Category | Purpose | Start Here |

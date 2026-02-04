@@ -456,14 +456,28 @@ TTG/
 │   ├── cleanup-all.sh                # Legacy cleanup
 │   └── list-resources.sh             # Resource inventory
 │
-├── docs/
-│   ├── TEST_RESULTS_DAY3.md          # Fault tolerance results (NEW)
-│   ├── MILESTONE_2_MESSAGE_QUEUE.md  # M2 planning doc
-│   ├── PROJECT_OVERVIEW.md           # Architecture docs
-│   └── ...                           # Other docs
+├── docs/                             # Documentation (categorized)
+│   ├── README.md                     # Docs navigation index
+│   ├── architecture/
+│   │   └── M2_QUEUE_ARCHITECTURE.md  # Queue system design
+│   ├── guides/
+│   │   ├── QUEUE_MODE_GUIDE.md       # Queue mode operations
+│   │   └── CONFIGURATION_GUIDE.md    # Configuration reference
+│   ├── results/
+│   │   ├── TEST_RESULTS_M2_FAULT_TOLERANCE.md  # Fault tolerance results
+│   │   └── TEST_RESULTS_M1_PARALLEL_JOBS.md    # M1 parallel results
+│   ├── setup/
+│   │   ├── KUBERNETES_SETUP.md       # Local K8s setup
+│   │   └── AZURE_AKS_GUIDE.md        # Azure deployment
+│   ├── knowledge/
+│   │   ├── KUBERNETES_EXPLAINED.md   # K8s concepts
+│   │   └── KIND_EXPLAINED.md         # Kind tutorial
+│   └── tracking/
+│       ├── PROJECT_TRACKER.md        # Milestone tracking
+│       └── PROJECT_OVERVIEW.md       # Project background
 │
-├── SUPERVISOR_REPORT.md              # Milestone 1 report
-└── SUPERVISOR_REPORT_M2.md           # This document (NEW)
+├── SUPERVISOR_REPORT.md              # Executive summary (M1→M2)
+└── SUPERVISOR_REPORT_M2.md           # This document - Detailed M2 report
 ```
 
 ---
