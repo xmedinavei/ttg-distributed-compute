@@ -82,8 +82,8 @@ Distributed computation system using Kubernetes to process 10,000 parameters acr
 | `scripts/cleanup-ttg.sh`                         | NEW      | Safe cleanup with protected resources  |
 | `scripts/recover-infra.sh`                       | NEW      | Infrastructure recovery script         |
 | `scripts/aggregate_results.py`                   | NEW      | Results aggregation from Redis         |
-| `docs/QUEUE_MODE_GUIDE.md`                       | NEW      | Comprehensive queue mode documentation |
-| `docs/TEST_RESULTS_DAY3.md`                      | NEW      | Fault tolerance test results           |
+| `docs/guides/QUEUE_MODE_GUIDE.md`                | NEW      | Comprehensive queue mode documentation |
+| `docs/results/TEST_RESULTS_M2_FAULT_TOLERANCE.md`| NEW      | Fault tolerance test results           |
 
 ---
 

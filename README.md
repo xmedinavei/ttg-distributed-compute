@@ -143,16 +143,16 @@ kubectl delete job ttg-computation                # Quick job reset
 
 ## 📖 Documentation
 
-| Document                                                     | Description                               |
-| ------------------------------------------------------------ | ----------------------------------------- |
-| [SUPERVISOR_REPORT.md](SUPERVISOR_REPORT.md)                 | **Executive summary & quick start guide** |
-| [docs/QUEUE_MODE_GUIDE.md](docs/QUEUE_MODE_GUIDE.md)         | **Milestone 2 queue mode documentation**  |
-| [docs/TEST_RESULTS_DAY3.md](docs/TEST_RESULTS_DAY3.md)       | **Fault tolerance test results**          |
-| [docs/PROJECT_TRACKER.md](docs/PROJECT_TRACKER.md)           | Project milestone tracking                |
-| [docs/KIND_EXPLAINED.md](docs/KIND_EXPLAINED.md)             | Kind tutorial for Kubernetes beginners    |
-| [docs/KUBERNETES_EXPLAINED.md](docs/KUBERNETES_EXPLAINED.md) | K8s concepts explained                    |
-| [docs/CONFIGURATION_GUIDE.md](docs/CONFIGURATION_GUIDE.md)   | Configuration reference                   |
-| [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md)         | Project background & architecture         |
+> **📚 Full documentation index:** [docs/README.md](docs/README.md)
+
+| Category | Key Documents |
+|----------|---------------|
+| **Quick Start** | [SUPERVISOR_REPORT.md](SUPERVISOR_REPORT.md) - Executive summary |
+| **Guides** | [Queue Mode Guide](docs/guides/QUEUE_MODE_GUIDE.md) ・ [Configuration](docs/guides/CONFIGURATION_GUIDE.md) |
+| **Results** | [M2 Fault Tolerance](docs/results/TEST_RESULTS_M2_FAULT_TOLERANCE.md) ・ [M1 Parallel Jobs](docs/results/TEST_RESULTS_M1_PARALLEL_JOBS.md) |
+| **Setup** | [Local K8s](docs/setup/KUBERNETES_SETUP.md) ・ [Azure AKS](docs/setup/AZURE_AKS_GUIDE.md) |
+| **Knowledge** | [Kubernetes Explained](docs/knowledge/KUBERNETES_EXPLAINED.md) ・ [Kind Tutorial](docs/knowledge/KIND_EXPLAINED.md) |
+| **Tracking** | [Project Tracker](docs/tracking/PROJECT_TRACKER.md) ・ [Overview](docs/tracking/PROJECT_OVERVIEW.md) |
 
 ---
 
@@ -188,6 +188,14 @@ TTG/
 │   └── aggregate_results.py      # Results aggregation
 │
 ├── docs/                         # Documentation
+│   ├── README.md                 # Docs index
+│   ├── architecture/             # System design docs
+│   ├── guides/                   # Operational guides
+│   ├── knowledge/                # Learning materials
+│   ├── results/                  # Test results
+│   ├── setup/                    # Installation guides
+│   └── tracking/                 # Project tracking
+│
 ├── SUPERVISOR_REPORT.md          # Executive summary
 ├── requirements.txt              # Python dependencies
 └── README.md                     # This file
@@ -306,7 +314,7 @@ docker push <your-acr-name>.azurecr.io/ttg-worker:latest
 kubectl apply -f k8s/manifests/parallel-jobs.yaml
 ```
 
-See [docs/KUBERNETES_SETUP.md](docs/KUBERNETES_SETUP.md) for detailed Azure instructions.
+See [docs/setup/KUBERNETES_SETUP.md](docs/setup/KUBERNETES_SETUP.md) for detailed Azure instructions.
 
 ---
 

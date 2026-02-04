@@ -696,7 +696,7 @@ For our simulated work (1ms/param), 100 is optimal.
 
 ## Related Documentation
 
-- [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md) - High-level project description
-- [KUBERNETES_SETUP.md](KUBERNETES_SETUP.md) - Cluster setup guide
+- [PROJECT_OVERVIEW.md](../tracking/PROJECT_OVERVIEW.md) - High-level project description
+- [KUBERNETES_SETUP.md](../setup/KUBERNETES_SETUP.md) - Cluster setup guide
 - [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) - Environment variables
-- [TEST_RESULTS_v1.1.0.md](TEST_RESULTS_v1.1.0.md) - Milestone 1 results
+- [TEST_RESULTS_M1_PARALLEL_JOBS.md](../results/TEST_RESULTS_M1_PARALLEL_JOBS.md) - Milestone 1 results

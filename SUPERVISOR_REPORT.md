@@ -318,10 +318,24 @@ TTG/
 │   └── aggregate_results.py # Results aggregation
 │
 ├── docs/
-│   ├── QUEUE_MODE_GUIDE.md     # Milestone 2 guide
-│   ├── TEST_RESULTS_DAY3.md    # Fault tolerance results
-│   ├── PROJECT_TRACKER.md      # Milestone tracking
-│   └── ...
+│   ├── README.md                        # Docs navigation index
+│   ├── architecture/                    # System design
+│   │   └── M2_QUEUE_ARCHITECTURE.md
+│   ├── guides/                          # Operational guides
+│   │   ├── QUEUE_MODE_GUIDE.md
+│   │   └── CONFIGURATION_GUIDE.md
+│   ├── results/                         # Test results
+│   │   ├── TEST_RESULTS_M2_FAULT_TOLERANCE.md
+│   │   └── TEST_RESULTS_M1_PARALLEL_JOBS.md
+│   ├── setup/                           # Installation
+│   │   ├── KUBERNETES_SETUP.md
+│   │   └── AZURE_AKS_GUIDE.md
+│   ├── knowledge/                       # Tutorials
+│   │   ├── KUBERNETES_EXPLAINED.md
+│   │   └── KIND_EXPLAINED.md
+│   └── tracking/                        # Project status
+│       ├── PROJECT_TRACKER.md
+│       └── PROJECT_OVERVIEW.md
 │
 ├── SUPERVISOR_REPORT.md    # This document
 └── README.md               # Project readme
@@ -343,12 +357,12 @@ TTG/
 
 ## Contact & Documentation
 
-| Document                                               | Description                  |
-| ------------------------------------------------------ | ---------------------------- |
-| [README.md](README.md)                                 | Quick start guide            |
-| [docs/QUEUE_MODE_GUIDE.md](docs/QUEUE_MODE_GUIDE.md)   | Milestone 2 technical guide  |
-| [docs/TEST_RESULTS_DAY3.md](docs/TEST_RESULTS_DAY3.md) | Fault tolerance test results |
-| [docs/PROJECT_TRACKER.md](docs/PROJECT_TRACKER.md)     | Milestone tracking           |
+| Document                                                                       | Description                  |
+| ------------------------------------------------------------------------------ | ---------------------------- |
+| [README.md](README.md)                                                         | Quick start guide            |
+| [docs/guides/QUEUE_MODE_GUIDE.md](docs/guides/QUEUE_MODE_GUIDE.md)             | Milestone 2 technical guide  |
+| [docs/results/TEST_RESULTS_M2_FAULT_TOLERANCE.md](docs/results/TEST_RESULTS_M2_FAULT_TOLERANCE.md) | Fault tolerance test results |
+| [docs/tracking/PROJECT_TRACKER.md](docs/tracking/PROJECT_TRACKER.md)           | Milestone tracking           |
 
 ---
 
