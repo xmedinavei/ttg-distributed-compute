@@ -446,9 +446,17 @@ print_header "Step 5: Results Summary"
 END_TIME=$(date +%s)
 TOTAL_TIME=$((END_TIME - START_TIME))
 FINAL_RESULTS=$(kubectl exec ttg-redis -- redis-cli XLEN ttg:results 2>/dev/null || echo "0")
-FINAL_PENDING=$(kubectl exec ttg-redis -- redis-cli XPENDING ttg:tasks ttg-workers 2>/dev/null | head -1 || echo "0")
-RUNNING_WORKERS=$(kubectl get pods -l ttg.io/mode=fault-demo-standalone --no-headers 2>/dev/null | grep -c "Running" || echo "0")
-COMPLETED_WORKERS=$(kubectl get pods -l ttg.io/mode=fault-demo-standalone --no-headers 2>/dev/null | grep -c "Completed" || echo "0")
+FINAL_PENDING=$(kubectl exec ttg-redis -- redis-cli XPENDING ttg:tasks ttg-workers 2>/dev/null | head -1 | tr -d '[:space:]' || echo "0")
+
+# Count running and completed workers (handle empty results gracefully)
+POD_LIST=$(kubectl get pods -l ttg.io/mode=fault-demo-standalone --no-headers 2>/dev/null || echo "")
+if [[ -n "$POD_LIST" ]]; then
+    RUNNING_WORKERS=$(echo "$POD_LIST" | grep -c "Running" 2>/dev/null) || RUNNING_WORKERS=0
+    COMPLETED_WORKERS=$(echo "$POD_LIST" | grep -c "Completed" 2>/dev/null) || COMPLETED_WORKERS=0
+else
+    RUNNING_WORKERS=0
+    COMPLETED_WORKERS=0
+fi
 
 echo -e "  ${CYAN}Workload:${NC}"
 echo "    • Total Parameters: $TOTAL_PARAMS"
