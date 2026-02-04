@@ -13,8 +13,8 @@
 # HTTP client (if workers need to call APIs)
 # requests>=2.28.0
 
-# Redis client (for future queue-based architecture)
-# redis>=4.5.0
+# Redis client (for Milestone 2 queue-based architecture)
+redis>=4.5.0
 
 # Message queue clients (for future iterations)
 # celery>=5.2.0

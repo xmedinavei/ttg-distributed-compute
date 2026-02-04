@@ -1,0 +1,177 @@
+# TTG Redis - Message Queue Backend for Milestone 2
+#
+# This manifest deploys Redis with persistence to the Kind cluster.
+# Redis Streams will be used for dynamic task distribution.
+#
+# Components:
+#   - PersistentVolumeClaim: Stores Redis data (survives pod restarts)
+#   - Pod: Redis server with AOF persistence enabled
+#   - Service: Internal DNS name for workers to connect
+#
+# Deploy:
+#   kubectl apply -f redis.yaml
+#
+# Verify:
+#   kubectl get pods -l app.kubernetes.io/name=ttg-redis
+#   kubectl exec -it ttg-redis -- redis-cli ping
+#
+# Monitor queues:
+#   kubectl exec -it ttg-redis -- redis-cli XLEN ttg:tasks
+#   kubectl exec -it ttg-redis -- redis-cli XPENDING ttg:tasks ttg-workers
+#
+# Clean up:
+#   kubectl delete -f redis.yaml
+
+---
+# ═══════════════════════════════════════════════════════════════════════════
+# PERSISTENT VOLUME CLAIM
+# ═══════════════════════════════════════════════════════════════════════════
+# This reserves storage space for Redis data.
+# If Redis pod restarts, the data (task queue, results) survives.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ttg-redis-data
+  labels:
+    # Standard Kubernetes labels
+    app.kubernetes.io/name: ttg-redis
+    app.kubernetes.io/instance: ttg-redis-data
+    app.kubernetes.io/version: "7.2"
+    app.kubernetes.io/component: storage
+    app.kubernetes.io/part-of: ttg-distributed-compute
+    app.kubernetes.io/managed-by: kubectl
+    # TTG custom labels
+    ttg.io/project: distributed-compute
+    ttg.io/milestone: "2"
+spec:
+  accessModes:
+    - ReadWriteOnce # Only one pod can mount this volume
+  resources:
+    requests:
+      storage: 1Gi # 1GB is plenty for task queue metadata
+  # Kind uses local-path-provisioner by default
+  storageClassName: standard
+
+---
+# ═══════════════════════════════════════════════════════════════════════════
+# REDIS POD
+# ═══════════════════════════════════════════════════════════════════════════
+# Single Redis instance for MVP. For production, use Redis Cluster or Sentinel.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ttg-redis
+  labels:
+    # Standard Kubernetes labels
+    app.kubernetes.io/name: ttg-redis
+    app.kubernetes.io/instance: ttg-redis
+    app.kubernetes.io/version: "7.2"
+    app.kubernetes.io/component: queue
+    app.kubernetes.io/part-of: ttg-distributed-compute
+    app.kubernetes.io/managed-by: kubectl
+    # TTG custom labels
+    ttg.io/project: distributed-compute
+    ttg.io/milestone: "2"
+    ttg.io/role: message-queue
+  annotations:
+    description: "Redis message queue for TTG distributed task processing"
+spec:
+  # Restart if Redis crashes
+  restartPolicy: Always
+
+  containers:
+    - name: redis
+      # Official Redis image - Alpine variant is smaller
+      image: redis:7.2-alpine
+
+      # Redis server with AOF persistence enabled
+      # AOF (Append Only File) logs every write operation
+      # This ensures data survives Redis restarts
+      command:
+        - redis-server
+        - --appendonly yes # Enable AOF persistence
+        - --appendfsync everysec # Sync to disk every second (balanced)
+        - --maxmemory 128mb # Limit memory usage (conservative for 8GB machine)
+        - --maxmemory-policy noeviction # Don't delete data when full, return errors
+        - --loglevel notice # Log important events
+
+      ports:
+        - containerPort: 6379
+          name: redis
+          protocol: TCP
+
+      # Resource limits (conservative for 8GB RAM machine)
+      resources:
+        requests:
+          cpu: "100m" # 0.1 CPU cores requested
+          memory: "128Mi" # 128MB RAM requested
+        limits:
+          cpu: "500m" # Max 0.5 CPU cores
+          memory: "256Mi" # Max 256MB RAM
+
+      # Health checks
+      # Liveness: Is Redis alive?
+      livenessProbe:
+        exec:
+          command: ["redis-cli", "ping"]
+        initialDelaySeconds: 5
+        periodSeconds: 10
+        timeoutSeconds: 5
+        failureThreshold: 3
+
+      # Readiness: Is Redis ready to accept connections?
+      readinessProbe:
+        exec:
+          command: ["redis-cli", "ping"]
+        initialDelaySeconds: 5
+        periodSeconds: 5
+        timeoutSeconds: 3
+        failureThreshold: 3
+
+      # Mount the persistent volume
+      volumeMounts:
+        - name: redis-data
+          mountPath: /data # Redis default data directory
+
+  volumes:
+    - name: redis-data
+      persistentVolumeClaim:
+        claimName: ttg-redis-data
+
+---
+# ═══════════════════════════════════════════════════════════════════════════
+# REDIS SERVICE
+# ═══════════════════════════════════════════════════════════════════════════
+# This creates a stable DNS name for Redis.
+# Workers connect to: ttg-redis.default.svc.cluster.local:6379
+# Or simply: ttg-redis:6379 (within same namespace)
+apiVersion: v1
+kind: Service
+metadata:
+  name: ttg-redis
+  labels:
+    # Standard Kubernetes labels
+    app.kubernetes.io/name: ttg-redis
+    app.kubernetes.io/instance: ttg-redis
+    app.kubernetes.io/version: "7.2"
+    app.kubernetes.io/component: queue
+    app.kubernetes.io/part-of: ttg-distributed-compute
+    app.kubernetes.io/managed-by: kubectl
+    # TTG custom labels
+    ttg.io/project: distributed-compute
+    ttg.io/milestone: "2"
+  annotations:
+    description: "Internal service for TTG Redis message queue"
+spec:
+  # ClusterIP = internal only (not exposed outside cluster)
+  type: ClusterIP
+
+  # Select pods with this label
+  selector:
+    app.kubernetes.io/name: ttg-redis
+
+  ports:
+    - name: redis
+      port: 6379 # Service port (what workers connect to)
+      targetPort: 6379 # Pod port (where Redis listens)
+      protocol: TCP

@@ -1,0 +1,189 @@
+# TTG Parallel Jobs - Queue Mode (Milestone 2)
+#
+# This creates workers that pull tasks dynamically from Redis Streams.
+# Unlike the static mode (parallel-jobs.yaml), workers don't calculate
+# fixed ranges - they pull tasks from a shared queue.
+#
+# Prerequisites:
+#   - Redis must be running: kubectl apply -f redis.yaml
+#   - Image must be built: ./scripts/build.sh --version 1.2.0 --load-kind
+#
+# How it works:
+#   1. Worker 0 checks if task stream is empty
+#   2. If empty, Worker 0 creates all task chunks (e.g., 100 chunks for 10K params)
+#   3. All workers pull tasks from the queue (XREADGROUP)
+#   4. When a task is done, worker publishes result and acknowledges (XACK)
+#   5. If no tasks for 30 seconds, worker exits
+#
+# Deploy:
+#   kubectl apply -f parallel-jobs-queue.yaml
+#
+# Monitor:
+#   kubectl get pods -l app.kubernetes.io/name=ttg-worker
+#   kubectl logs -l app.kubernetes.io/name=ttg-worker -f
+#   kubectl exec ttg-redis -- redis-cli XLEN ttg:tasks
+#   kubectl exec ttg-redis -- redis-cli XLEN ttg:results
+#
+# Clean up:
+#   kubectl delete -f parallel-jobs-queue.yaml
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ttg-computation-queue
+  labels:
+    # Standard labels for identification
+    app.kubernetes.io/name: ttg-worker
+    app.kubernetes.io/instance: ttg-computation-queue
+    app.kubernetes.io/version: "1.2.0"
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/part-of: ttg-distributed-compute
+    app.kubernetes.io/managed-by: kubectl
+    # TTG custom labels
+    ttg.io/project: distributed-compute
+    ttg.io/milestone: "2"
+    ttg.io/mode: queue
+  annotations:
+    description: "TTG queue-based distributed computation job"
+    ttg.io/total-parameters: "10000"
+    ttg.io/chunk-size: "100"
+    ttg.io/worker-count: "3"
+    ttg.io/redis-host: "ttg-redis"
+spec:
+  # Parallel execution configuration
+  # In queue mode, workers pull tasks dynamically, so we don't need indexed completion
+  completions: 3 # Total number of workers to run
+  parallelism: 3 # All workers run simultaneously
+  completionMode: Indexed # Still use indexed for unique WORKER_ID
+
+  # Retry policy
+  backoffLimit: 3 # Retry failed pods up to 3 times
+
+  # Clean up completed pods after 1 hour
+  ttlSecondsAfterFinished: 3600
+
+  template:
+    metadata:
+      labels:
+        # Standard labels
+        app.kubernetes.io/name: ttg-worker
+        app.kubernetes.io/instance: ttg-computation-queue
+        app.kubernetes.io/version: "1.2.0"
+        app.kubernetes.io/component: worker
+        app.kubernetes.io/part-of: ttg-distributed-compute
+        # TTG custom labels
+        ttg.io/project: distributed-compute
+        ttg.io/mode: queue
+      annotations:
+        ttg.io/log-format: "text"
+        ttg.io/log-level: "INFO"
+    spec:
+      # Don't restart on failure (Job controller handles retries)
+      restartPolicy: Never
+
+      # Termination grace period - give worker time to finish current chunk
+      terminationGracePeriodSeconds: 60
+
+      # Spread pods across nodes for true distribution
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - ttg-worker
+                topologyKey: kubernetes.io/hostname
+
+      containers:
+        - name: ttg-worker
+          # Image with queue support
+          image: ttg-worker:v1.2.0
+
+          # For kind, don't pull from registry
+          imagePullPolicy: IfNotPresent
+
+          # Write termination message to file
+          terminationMessagePath: /dev/termination-log
+          terminationMessagePolicy: File
+
+          env:
+            # ════════════════════════════════════════════════════════════════
+            # QUEUE MODE SETTINGS (Milestone 2)
+            # ════════════════════════════════════════════════════════════════
+
+            # Enable queue mode
+            - name: USE_QUEUE
+              value: "true"
+
+            # Redis connection (K8s service name)
+            - name: REDIS_HOST
+              value: "ttg-redis"
+            - name: REDIS_PORT
+              value: "6379"
+
+            # Task configuration
+            - name: TOTAL_PARAMETERS
+              value: "10000"
+            - name: CHUNK_SIZE
+              value: "100" # 100 params per task = 100 tasks total
+
+            # Worker behavior
+            - name: IDLE_TIMEOUT_SECONDS
+              value: "30" # Exit after 30s of no tasks
+            - name: SIMULATE_WORK_MS
+              value: "1" # 1ms simulated work per param
+
+            # ════════════════════════════════════════════════════════════════
+            # WORKER IDENTITY (from K8s)
+            # ════════════════════════════════════════════════════════════════
+
+            # Unique worker ID from Job index
+            - name: WORKER_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.annotations['batch.kubernetes.io/job-completion-index']
+
+            # Pod and node info for logging
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+
+            # ════════════════════════════════════════════════════════════════
+            # LOGGING
+            # ════════════════════════════════════════════════════════════════
+            - name: LOG_LEVEL
+              value: "INFO"
+            - name: LOG_FORMAT
+              value: "text"
+
+          # Resource limits (conservative for 8GB machine)
+          resources:
+            requests:
+              cpu: "100m" # 0.1 CPU cores
+              memory: "128Mi" # 128MB RAM
+            limits:
+              cpu: "500m" # Max 0.5 CPU cores
+              memory: "256Mi" # Max 256MB RAM
+
+          # Security context
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop:
+                - ALL

@@ -67,6 +67,13 @@ ENV PATH=/home/worker/.local/bin:$PATH \
 
 # Environment variables with defaults
 # These can be overridden at runtime
+# 
+# MILESTONE 1 (Static Mode):
+#   WORKER_ID, TOTAL_WORKERS, TOTAL_PARAMETERS, BATCH_SIZE
+#
+# MILESTONE 2 (Queue Mode):
+#   USE_QUEUE=true, REDIS_HOST, REDIS_PORT, CHUNK_SIZE, IDLE_TIMEOUT_SECONDS
+#
 ENV WORKER_ID=0 \
     TOTAL_WORKERS=3 \
     TOTAL_PARAMETERS=10000 \
@@ -75,7 +82,13 @@ ENV WORKER_ID=0 \
     SAVE_OUTPUT=false \
     PYTHONUNBUFFERED=1 \
     LOG_LEVEL=INFO \
-    LOG_FORMAT=text
+    LOG_FORMAT=text \
+    # Milestone 2: Queue mode settings
+    USE_QUEUE=false \
+    REDIS_HOST=ttg-redis \
+    REDIS_PORT=6379 \
+    CHUNK_SIZE=100 \
+    IDLE_TIMEOUT_SECONDS=30
 
 # Health check (optional, useful for deployments)
 # HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \

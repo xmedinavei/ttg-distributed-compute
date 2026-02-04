@@ -49,7 +49,7 @@ from logging_config import (
 # CONSTANTS
 # ═══════════════════════════════════════════════════════════════════════════
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"  # Updated for Milestone 2
 PROJECT = "ttg-distributed-compute"
 
 
@@ -406,13 +406,430 @@ class DistributedWorker:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# QUEUE-BASED WORKER CLASS (Milestone 2)
+# ═══════════════════════════════════════════════════════════════════════════
+
+class QueueWorker:
+    """
+    Queue-based worker that pulls tasks from Redis Streams.
+
+    Unlike DistributedWorker (which calculates a fixed range at startup),
+    QueueWorker dynamically pulls tasks from a Redis queue. This provides:
+
+    1. **Fault Tolerance**: If a worker crashes, its task returns to the queue
+    2. **Load Balancing**: Fast workers automatically get more tasks
+    3. **Elastic Scaling**: Add/remove workers without reconfiguration
+
+    Lifecycle:
+    1. Connect to Redis
+    2. If Worker 0 AND stream empty: initialize all task chunks
+    3. Loop: pull task → process → publish result → acknowledge
+    4. If no tasks for IDLE_TIMEOUT_SECONDS: exit gracefully
+
+    Environment Variables:
+        WORKER_ID: Unique worker identifier (0, 1, 2, ...)
+        REDIS_HOST: Redis hostname (default: ttg-redis for K8s)
+        REDIS_PORT: Redis port (default: 6379)
+        TOTAL_PARAMETERS: Total params to process (default: 10000)
+        CHUNK_SIZE: Parameters per task chunk (default: 100)
+        IDLE_TIMEOUT_SECONDS: Exit after this many seconds of no tasks (default: 30)
+        SIMULATE_WORK_MS: Milliseconds to simulate per parameter (default: 1)
+    """
+
+    def __init__(self):
+        """Initialize the QueueWorker."""
+        # Initialize logging first
+        self.worker_id = int(os.getenv('WORKER_ID', '0'))
+        setup_logging(worker_id=self.worker_id)
+
+        self.logger = get_logger('queue_worker')
+        self.lifecycle = LifecycleLogger(self.logger)
+
+        # Log starting
+        self.lifecycle.starting(version=VERSION, project=PROJECT)
+
+        # Read configuration from environment
+        self.total_parameters = int(os.getenv('TOTAL_PARAMETERS', '10000'))
+        self.chunk_size = int(os.getenv('CHUNK_SIZE', '100'))
+        self.idle_timeout_seconds = int(
+            os.getenv('IDLE_TIMEOUT_SECONDS', '30'))
+        self.simulate_work_ms = int(os.getenv('SIMULATE_WORK_MS', '1'))
+        self.hostname = os.getenv('HOSTNAME', 'unknown')
+        self.pod_name = os.getenv('POD_NAME', self.hostname)
+        self.node_name = os.getenv('NODE_NAME', 'unknown')
+
+        # Redis connection settings
+        self.redis_host = os.getenv('REDIS_HOST', 'ttg-redis')
+        self.redis_port = int(os.getenv('REDIS_PORT', '6379'))
+
+        # Statistics
+        self.chunks_processed = 0
+        self.params_processed = 0
+        self.start_time: Optional[float] = None
+        self.end_time: Optional[float] = None
+
+        # Queue client (initialized in run())
+        self.queue = None
+
+        # Graceful shutdown handler
+        self.killer = GracefulKiller(self.logger, self.lifecycle)
+
+        # Consumer name for Redis
+        self.consumer_name = f"worker-{self.worker_id}"
+
+        # Log initialized
+        config = {
+            'worker_id': self.worker_id,
+            'mode': 'queue',
+            'redis_host': self.redis_host,
+            'redis_port': self.redis_port,
+            'total_parameters': self.total_parameters,
+            'chunk_size': self.chunk_size,
+            'idle_timeout_seconds': self.idle_timeout_seconds,
+            'simulate_work_ms': self.simulate_work_ms,
+            'consumer_name': self.consumer_name,
+            'hostname': self.hostname,
+            'pod_name': self.pod_name,
+            'node_name': self.node_name
+        }
+        self.lifecycle.initialized(config)
+
+    def _connect_to_redis(self) -> bool:
+        """
+        Establish connection to Redis.
+
+        Returns:
+            True if connected successfully
+        """
+        # Import here to avoid import error if redis not installed
+        from queue_utils import TaskQueue
+
+        self.queue = TaskQueue(
+            redis_host=self.redis_host,
+            redis_port=self.redis_port
+        )
+
+        self.logger.info(
+            f"Connecting to Redis at {self.redis_host}:{self.redis_port}..."
+        )
+
+        return self.queue.connect(retry=True)
+
+    def _maybe_initialize_tasks(self):
+        """
+        Initialize task queue if this is Worker 0 and the queue is empty.
+
+        Only Worker 0 should initialize tasks to avoid race conditions.
+        Other workers wait briefly for initialization to complete.
+        """
+        stream_length = self.queue.get_stream_length()
+
+        if self.worker_id == 0:
+            if stream_length == 0:
+                self.logger.info(
+                    f"Worker 0: Initializing task queue with {self.total_parameters} params "
+                    f"(chunk_size={self.chunk_size})"
+                )
+                tasks_created = self.queue.initialize_tasks(
+                    total_params=self.total_parameters,
+                    chunk_size=self.chunk_size
+                )
+                self.logger.info(f"✅ Created {tasks_created} task chunks")
+            else:
+                self.logger.info(
+                    f"Worker 0: Task queue already has {stream_length} tasks, skipping init"
+                )
+        else:
+            # Non-zero workers: wait a moment for Worker 0 to initialize
+            if stream_length == 0:
+                self.logger.info(
+                    f"Worker {self.worker_id}: Queue empty, waiting for Worker 0 to initialize..."
+                )
+                time.sleep(2)  # Brief wait for Worker 0
+
+    def _compute_parameter(self, param_id: int) -> Dict[str, Any]:
+        """
+        Process a single parameter and return the result.
+
+        This is the same computation as DistributedWorker for consistency.
+
+        Args:
+            param_id: The parameter index to process
+
+        Returns:
+            Dictionary with parameter ID and computed result
+        """
+        # Simulate computation time
+        if self.simulate_work_ms > 0:
+            time.sleep(self.simulate_work_ms / 1000.0)
+
+        # Placeholder computation: compute a hash-based value
+        input_string = f"param_{param_id}_worker_{self.worker_id}"
+        hash_result = hashlib.sha256(input_string.encode()).hexdigest()[:16]
+
+        # Simulate some numerical result based on parameter
+        numerical_result = (param_id * 7 + 13) % 1000 + \
+            float(f"0.{param_id % 100}")
+
+        return {
+            'param_id': param_id,
+            'result': numerical_result,
+            'hash': hash_result,
+            'worker_id': self.worker_id,
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        }
+
+    def _process_chunk(self, task: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Process all parameters in a task chunk.
+
+        Args:
+            task: Task dictionary with start_param, end_param, etc.
+
+        Returns:
+            Result summary for the chunk
+        """
+        chunk_id = task['chunk_id']
+        start_param = int(task['start_param'])
+        end_param = int(task['end_param'])
+        params_count = end_param - start_param
+
+        self.logger.info(
+            f"📦 Processing chunk {chunk_id}: params {start_param}-{end_param} "
+            f"({params_count} params)"
+        )
+
+        chunk_start_time = time.perf_counter()
+        results = []
+        result_sum = 0
+
+        for param_id in range(start_param, end_param):
+            if self.killer.kill_now:
+                self.logger.warning(
+                    f"Shutdown requested during chunk {chunk_id}, "
+                    f"processed {len(results)}/{params_count}"
+                )
+                break
+
+            result = self._compute_parameter(param_id)
+            results.append(result)
+            result_sum += result['result']
+            self.params_processed += 1
+
+        chunk_duration = time.perf_counter() - chunk_start_time
+
+        # Build result summary
+        result_summary = {
+            'sum': result_sum,
+            'count': len(results),
+            'min': min(r['result'] for r in results) if results else 0,
+            'max': max(r['result'] for r in results) if results else 0,
+            'avg': result_sum / len(results) if results else 0
+        }
+
+        self.logger.info(
+            f"✅ Chunk {chunk_id} complete: {len(results)} params in {chunk_duration:.2f}s "
+            f"(sum={result_sum:.2f})"
+        )
+
+        return {
+            'chunk_id': chunk_id,
+            'params_processed': len(results),
+            'duration_seconds': chunk_duration,
+            'result_summary': result_summary,
+            'interrupted': self.killer.kill_now
+        }
+
+    def _process_tasks(self) -> Dict[str, Any]:
+        """
+        Main loop: pull tasks, process them, publish results, acknowledge.
+
+        Continues until:
+        - No tasks available for IDLE_TIMEOUT_SECONDS
+        - Shutdown signal received
+
+        Returns:
+            Execution summary
+        """
+        # Calculate how many empty reads = timeout
+        # get_next_task blocks for 5000ms (5s) by default
+        block_time_seconds = 5
+        max_empty_reads = max(
+            1, self.idle_timeout_seconds // block_time_seconds)
+
+        consecutive_empty = 0
+
+        self.logger.info(
+            f"Starting task consumption loop "
+            f"(idle timeout: {self.idle_timeout_seconds}s = {max_empty_reads} empty reads)"
+        )
+
+        while not self.killer.kill_now:
+            # Try to get next task
+            task = self.queue.get_next_task(
+                consumer_name=self.consumer_name,
+                block_ms=block_time_seconds * 1000
+            )
+
+            if task is None:
+                consecutive_empty += 1
+                self.logger.debug(
+                    f"No task received ({consecutive_empty}/{max_empty_reads} empty reads)"
+                )
+
+                if consecutive_empty >= max_empty_reads:
+                    self.logger.info(
+                        f"No tasks for {self.idle_timeout_seconds}s, assuming queue is empty"
+                    )
+                    break
+                continue
+
+            # Got a task! Reset empty counter
+            consecutive_empty = 0
+
+            # Process the chunk
+            result = self._process_chunk(task)
+            self.chunks_processed += 1
+
+            # Publish result to results stream
+            self.queue.publish_result(
+                chunk_id=task['chunk_id'],
+                worker_id=self.consumer_name,
+                result_data=result['result_summary'],
+                duration_seconds=result['duration_seconds']
+            )
+
+            # Acknowledge the task (removes from pending)
+            self.queue.ack_task(task['message_id'])
+
+            # Log progress
+            stats = self.queue.get_queue_stats()
+            self.logger.info(
+                f"📊 Progress: {stats['results_count']} chunks done, "
+                f"{stats['tasks_total'] - stats['results_count']} remaining, "
+                f"{stats['tasks_pending']} in-progress"
+            )
+
+        # Generate summary
+        return self._generate_summary()
+
+    def _generate_summary(self) -> Dict[str, Any]:
+        """Generate execution summary."""
+        duration = (self.end_time - self.start_time) if self.end_time else 0
+
+        # Get final queue stats
+        queue_stats = {}
+        if self.queue and self.queue.connected:
+            queue_stats = self.queue.get_queue_stats()
+
+        return {
+            'worker_id': self.worker_id,
+            'mode': 'queue',
+            'status': 'completed' if not self.killer.kill_now else 'interrupted',
+            'chunks_processed': self.chunks_processed,
+            'params_processed': self.params_processed,
+            'duration_seconds': round(duration, 2),
+            'params_per_second': round(self.params_processed / duration, 2) if duration > 0 else 0,
+            'chunks_per_second': round(self.chunks_processed / duration, 2) if duration > 0 else 0,
+            'consumer_name': self.consumer_name,
+            'redis_host': self.redis_host,
+            'hostname': self.hostname,
+            'node_name': self.node_name,
+            'queue_stats': queue_stats
+        }
+
+    def run(self) -> Dict[str, Any]:
+        """
+        Execute the queue-based worker.
+
+        Returns:
+            Execution summary dictionary
+        """
+        self.start_time = time.time()
+
+        # Print startup banner
+        print_banner(f"TTG Queue Worker {self.worker_id} Starting", {
+            'Version': VERSION,
+            'Mode': 'Queue (Redis Streams)',
+            'Worker ID': self.worker_id,
+            'Redis': f"{self.redis_host}:{self.redis_port}",
+            'Total Parameters': self.total_parameters,
+            'Chunk Size': self.chunk_size,
+            'Idle Timeout': f"{self.idle_timeout_seconds}s",
+            'Simulate Work': f"{self.simulate_work_ms}ms/param",
+            'Hostname': self.hostname,
+            'Node': self.node_name,
+            'Timestamp': datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
+        })
+
+        try:
+            # Step 1: Connect to Redis
+            self._connect_to_redis()
+
+            # Step 2: Maybe initialize tasks (Worker 0 only)
+            self._maybe_initialize_tasks()
+
+            # Step 3: Log running state
+            self.lifecycle.running(
+                total_work=f"{self.total_parameters} params (queue mode)")
+
+            # Step 4: Process tasks until done
+            summary = self._process_tasks()
+
+        except Exception as e:
+            self.logger.error(f"Worker failed: {e}", exc_info=True)
+            self.end_time = time.time()
+            summary = self._generate_summary()
+            summary['status'] = 'failed'
+            summary['error'] = str(e)
+            return summary
+
+        finally:
+            # Disconnect from Redis
+            if self.queue:
+                self.queue.disconnect()
+
+        self.end_time = time.time()
+        summary = self._generate_summary()
+
+        # Log completion
+        if summary['status'] == 'completed':
+            self.lifecycle.completed(summary)
+        else:
+            self.lifecycle.failed(
+                "Interrupted by shutdown signal", summary=summary)
+
+        # Print completion section
+        print_section(f"Queue Worker {self.worker_id} - Execution Complete")
+
+        # Log metrics
+        log_metric(self.logger, 'chunks_processed',
+                   self.chunks_processed, 'chunks')
+        log_metric(self.logger, 'params_processed',
+                   self.params_processed, 'params')
+        log_metric(self.logger, 'duration',
+                   summary['duration_seconds'], 'seconds')
+        log_metric(self.logger, 'throughput',
+                   summary['params_per_second'], 'params/sec')
+
+        return summary
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # MAIN ENTRY POINT
 # ═══════════════════════════════════════════════════════════════════════════
 
 def main():
-    """Main entry point."""
-    # Get worker ID for early logging
+    """
+    Main entry point.
+
+    Supports two modes based on USE_QUEUE environment variable:
+    - USE_QUEUE=false (default): Static range partitioning (Milestone 1)
+    - USE_QUEUE=true: Redis Streams queue mode (Milestone 2)
+    """
+    # Get config for early logging
     worker_id = int(os.getenv('WORKER_ID', '0'))
+    use_queue = os.getenv('USE_QUEUE', 'false').lower() == 'true'
 
     # Setup logging before anything else
     setup_logging(worker_id=worker_id)
@@ -421,6 +838,8 @@ def main():
     # Log startup
     logger.info("=" * 70)
     logger.info(f"TTG Distributed Worker v{VERSION}")
+    logger.info(
+        f"Mode: {'QUEUE (Redis Streams)' if use_queue else 'STATIC (Range Partitioning)'}")
     logger.info(f"Timestamp: {datetime.now(timezone.utc).isoformat()}")
     logger.info(f"Hostname: {os.getenv('HOSTNAME', 'unknown')}")
     logger.info(f"Pod: {os.getenv('POD_NAME', 'unknown')}")
@@ -428,15 +847,22 @@ def main():
     logger.info("=" * 70)
 
     try:
-        # Create and run worker
+        # Create appropriate worker based on mode
         with log_timing(logger, "worker_total_execution"):
-            worker = DistributedWorker()
+            if use_queue:
+                logger.info("Starting in QUEUE mode (Milestone 2)")
+                worker = QueueWorker()
+            else:
+                logger.info("Starting in STATIC mode (Milestone 1)")
+                worker = DistributedWorker()
+
             summary = worker.run()
 
-        # Optionally save results to file
-        save_output = os.getenv('SAVE_OUTPUT', 'false').lower() == 'true'
-        if save_output:
-            worker.save_results()
+        # Optionally save results to file (static mode only)
+        if not use_queue:
+            save_output = os.getenv('SAVE_OUTPUT', 'false').lower() == 'true'
+            if save_output:
+                worker.save_results()
 
         # Print final JSON summary (useful for aggregation)
         logger.info("=" * 70)
