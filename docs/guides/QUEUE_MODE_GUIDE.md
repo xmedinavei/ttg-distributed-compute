@@ -265,6 +265,20 @@ python scripts/aggregate_results.py --port 16379
 
 ## Running Queue Mode
 
+### One-Command Demo (Recommended)
+
+Use the same script for both queue backends:
+
+```bash
+# Redis backend demo
+./scripts/run-demo.sh --backend redis --scale small --fault-demo --monitor both
+
+# RabbitMQ backend demo
+./scripts/run-demo.sh --backend rabbitmq --scale small --fault-demo --monitor both
+```
+
+This keeps demo operations consistent while you compare backends.
+
 ### Using kubectl
 
 ```bash
@@ -329,6 +343,7 @@ USE_QUEUE=true REDIS_HOST=localhost WORKER_ID=0 python src/worker.py
 
 ## Monitoring & Observability
 
+<<<<<<< Current (Your changes)
 ### RabbitMQ Visual Monitoring (Recommended for M3 demos)
 
 ```bash
@@ -366,6 +381,22 @@ Expected lifecycle:
 - Failure test: retry queue may increase briefly; DLQ only grows if retries are exhausted.
 
 Future extension (out of current project scope): add Prometheus + Grafana in Kind for long-running dashboards, SLO tracking, and alerting.
+=======
+### Live Demo Monitoring by Backend
+
+- Redis backend:
+  - `python3 scripts/queue_monitor.py --total-params 10000`
+  - `python3 scripts/aggregate_results.py --port 6379`
+- RabbitMQ backend:
+  - `./scripts/rabbitmq_monitor.sh --watch 2`
+  - RabbitMQ UI: `kubectl port-forward pod/ttg-rabbitmq 15672:15672` then open `http://localhost:15672`
+
+Visual checkpoints for supervisor demos:
+- Queue depth decreases toward zero.
+- Active consumers match running workers.
+- Unacked messages return near zero by completion.
+- Retry/DLQ queues show expected behavior under failures.
+>>>>>>> Incoming (Background Agent changes)
 
 ### Real-time Queue Stats
 
@@ -513,16 +544,14 @@ kubectl exec ttg-redis -- redis-cli XGROUP DESTROY ttg:tasks ttg-workers
 ### Cleanup Commands
 
 ```bash
-# Delete job only (safe - keeps Redis data)
-kubectl delete job ttg-computation-queue
+# Strict TTG-only cleanup (recommended for shared machines)
+./scripts/cleanup-ttg.sh --all
 
-# Clear Redis data only (keeps job if running)
-kubectl exec ttg-redis -- redis-cli FLUSHALL
-
-# Full reset (job + data)
-kubectl delete job ttg-computation-queue
-kubectl exec ttg-redis -- redis-cli FLUSHALL
+# Preview only (no changes)
+./scripts/cleanup-ttg.sh --all --dry-run
 ```
+
+Safety note: cleanup scripts are configured to target only TTG project resources and avoid deleting unrelated Docker workloads.
 
 ---
 

@@ -67,7 +67,7 @@ _Test results, verification reports, and metrics._
 | -------------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | [TEST_RESULTS_M1_PARALLEL_JOBS.md](results/TEST_RESULTS_M1_PARALLEL_JOBS.md)     | Milestone 1: Parallel jobs verification (v1.1.0)                |
 | [TEST_RESULTS_M2_FAULT_TOLERANCE.md](results/TEST_RESULTS_M2_FAULT_TOLERANCE.md) | Milestone 2: Fault tolerance verification (100/100 chunks, 44s) |
-| [TEST_RESULTS_M3_RABBITMQ_MONITORING.md](results/TEST_RESULTS_M3_RABBITMQ_MONITORING.md) | Milestone 3: RabbitMQ backend + visual monitoring checkpoints |
+| [TEST_RESULTS_M3_RABBITMQ_MONITORING.md](results/TEST_RESULTS_M3_RABBITMQ_MONITORING.md) | Milestone 3: RabbitMQ backend + demo monitoring evidence |
 
 ---
 
@@ -91,8 +91,8 @@ _Project management, milestones, and status tracking._
 | [PROJECT_STATUS_REPORT.md](tracking/PROJECT_STATUS_REPORT.md) | **Project Manager report** (M1+M2 complete) - also available as [.docx](tracking/TTG_Project_Status_Report_M1_M2.docx) |
 | [PROJECT_OVERVIEW.md](tracking/PROJECT_OVERVIEW.md)           | High-level project overview, goals, and context                                                                        |
 | [PROJECT_TRACKER.md](tracking/PROJECT_TRACKER.md)             | Milestone tracking, sprint status, deliverables                                                                        |
-| [SUPERVISOR_REPORT_M3_RABBITMQ.md](tracking/SUPERVISOR_REPORT_M3_RABBITMQ.md) | Supervisor narrative report for M3 phased migration |
-| [SUPERVISOR_REPORT_M3_RABBITMQ_DOCX_TEMPLATE.md](tracking/SUPERVISOR_REPORT_M3_RABBITMQ_DOCX_TEMPLATE.md) | DOCX-ready template for supervisor submission |
+| [SUPERVISOR_REPORT_M3_RABBITMQ.md](tracking/SUPERVISOR_REPORT_M3_RABBITMQ.md) | Supervisor report for M3 phased migration |
+| [SUPERVISOR_REPORT_M3_RABBITMQ_DOCX_TEMPLATE.md](tracking/SUPERVISOR_REPORT_M3_RABBITMQ_DOCX_TEMPLATE.md) | DOCX-ready template for submission |
 
 ---
 
@@ -137,7 +137,8 @@ docs/
 │
 ├── results/                               # 📊 Test Results
 │   ├── TEST_RESULTS_M1_PARALLEL_JOBS.md
-│   └── TEST_RESULTS_M2_FAULT_TOLERANCE.md
+│   ├── TEST_RESULTS_M2_FAULT_TOLERANCE.md
+│   └── TEST_RESULTS_M3_RABBITMQ_MONITORING.md
 │
 ├── setup/                                 # 🚀 Installation & Setup
 │   ├── AZURE_AKS_GUIDE.md
