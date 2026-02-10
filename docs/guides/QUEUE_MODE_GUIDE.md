@@ -1,7 +1,7 @@
-# TTG Queue Mode Guide (Milestone 2)
+# TTG Queue Mode Guide (Milestone 2 + M3 Phased Migration)
 
-**Version:** 1.2.1  
-**Status:** ✅ Implemented with Fault Tolerance  
+**Version:** 1.3.0  
+**Status:** ✅ Redis queue stable + RabbitMQ phased path added  
 **Date:** February 2026
 
 ---
@@ -10,14 +10,15 @@
 
 1. [Overview](#overview)
 2. [Architecture](#architecture)
-3. [Quick Start](#quick-start)
-4. [Configuration Reference](#configuration-reference)
-5. [Running Queue Mode](#running-queue-mode)
-6. [Monitoring & Observability](#monitoring--observability)
-7. [Fault Tolerance](#fault-tolerance) ⭐ NEW
-8. [Troubleshooting](#troubleshooting)
-9. [API Reference](#api-reference)
-10. [FAQ](#faq)
+3. [Milestone 3: RabbitMQ Backend (Phased)](#milestone-3-rabbitmq-backend-phased)
+4. [Quick Start](#quick-start)
+5. [Configuration Reference](#configuration-reference)
+6. [Running Queue Mode](#running-queue-mode)
+7. [Monitoring & Observability](#monitoring--observability)
+8. [Fault Tolerance](#fault-tolerance) ⭐ NEW
+9. [Troubleshooting](#troubleshooting)
+10. [API Reference](#api-reference)
+11. [FAQ](#faq)
 
 ---
 
@@ -130,6 +131,41 @@ Queue Mode (Milestone 2) introduces a **message queue architecture** using Redis
 
 ---
 
+## Milestone 3: RabbitMQ Backend (Phased)
+
+Milestone 2 Redis Streams remains supported and is the fallback path. Milestone 3 adds a RabbitMQ queue backend so we can use broker-native retry and dead-letter handling while keeping local Kind operations simple.
+
+### Backend Toggle
+
+| Variable | Value | Effect |
+| --- | --- | --- |
+| `USE_QUEUE` | `true` | Enables queue worker mode |
+| `QUEUE_BACKEND` | `redis` | Uses existing Redis Streams flow |
+| `QUEUE_BACKEND` | `rabbitmq` | Uses RabbitMQ task/retry/DLQ flow |
+
+### RabbitMQ Topology
+
+- Task queue: `ttg.tasks`
+- Retry queue: `ttg.tasks.retry` (delay queue)
+- Dead-letter queue: `ttg.tasks.dlq`
+- Results queue: `ttg.results`
+
+### RabbitMQ Quick Deploy (Kind)
+
+```bash
+# Deploy RabbitMQ broker + management UI
+kubectl apply -f k8s/manifests/rabbitmq.yaml
+
+# Build/load worker image with RabbitMQ backend code
+docker build -t ttg-worker:v1.3.0 -f docker/Dockerfile .
+kind load docker-image ttg-worker:v1.3.0 --name ttg-sandbox
+
+# Run workers in RabbitMQ mode
+kubectl apply -f k8s/manifests/parallel-jobs-queue-rabbitmq.yaml
+```
+
+---
+
 ## Quick Start
 
 ### Prerequisites
@@ -195,8 +231,13 @@ python scripts/aggregate_results.py --port 16379
 | Variable               | Default     | Description                                         |
 | ---------------------- | ----------- | --------------------------------------------------- |
 | `USE_QUEUE`            | `false`     | Enable queue mode (`true`) or static mode (`false`) |
+| `QUEUE_BACKEND`        | `redis`     | Queue backend (`redis` or `rabbitmq`)               |
 | `REDIS_HOST`           | `ttg-redis` | Redis server hostname                               |
 | `REDIS_PORT`           | `6379`      | Redis server port                                   |
+| `RABBITMQ_HOST`        | `ttg-rabbitmq` | RabbitMQ server hostname                         |
+| `RABBITMQ_PORT`        | `5672`      | RabbitMQ AMQP port                                  |
+| `RABBITMQ_MAX_RETRIES` | `3`         | Max retries before dead-letter queue                |
+| `RABBITMQ_RETRY_DELAY_MS` | `5000`   | Retry delay before message returns to main queue    |
 | `CHUNK_SIZE`           | `100`       | Parameters per task chunk                           |
 | `IDLE_TIMEOUT_SECONDS` | `30`        | Exit after this many seconds with no tasks          |
 | `WORKER_ID`            | `0`         | Unique worker identifier (set by K8s)               |
@@ -239,6 +280,19 @@ kubectl apply -f k8s/manifests/parallel-jobs-queue.yaml
 kubectl delete job ttg-computation-queue
 ```
 
+### RabbitMQ Backend Mode (M3)
+
+```bash
+# Deploy RabbitMQ backend
+kubectl apply -f k8s/manifests/rabbitmq.yaml
+
+# Deploy RabbitMQ queue workers
+kubectl apply -f k8s/manifests/parallel-jobs-queue-rabbitmq.yaml
+
+# Watch queue workers
+kubectl get pods -l ttg.io/queue-backend=rabbitmq -w
+```
+
 ### Custom Configuration
 
 Edit `k8s/manifests/parallel-jobs-queue.yaml`:
@@ -274,6 +328,44 @@ USE_QUEUE=true REDIS_HOST=localhost WORKER_ID=0 python src/worker.py
 ---
 
 ## Monitoring & Observability
+
+### RabbitMQ Visual Monitoring (Recommended for M3 demos)
+
+```bash
+# Open RabbitMQ management UI
+kubectl port-forward pod/ttg-rabbitmq 15672:15672
+# URL: http://localhost:15672
+# user/pass: guest / guest
+```
+
+UI checkpoints for demos and supervisor reviews:
+- Queue depth: `ttg.tasks` decreases to zero by run completion.
+- Consumers: active consumer count aligns with worker pods.
+- Unacked messages: spikes during processing, returns to near zero at end.
+- Throughput rates: publish/deliver/ack charts show active flow.
+- Reliability path: `ttg.tasks.retry` and `ttg.tasks.dlq` reflect retry/failure behavior.
+
+### RabbitMQ CLI Monitoring Points
+
+```bash
+# One-time queue snapshot
+./scripts/rabbitmq_monitor.sh
+
+# Live queue snapshot every 2 seconds
+./scripts/rabbitmq_monitor.sh --watch 2
+
+# Worker pods and logs
+kubectl get pods -l ttg.io/queue-backend=rabbitmq
+kubectl logs -l ttg.io/queue-backend=rabbitmq -f
+```
+
+Expected lifecycle:
+- Start: `ttg.tasks` high, `ttg.results` low.
+- Mid-run: `ttg.tasks` decreasing, `ttg.results` increasing.
+- End: `ttg.tasks` near zero, `ttg.results` equals chunk count.
+- Failure test: retry queue may increase briefly; DLQ only grows if retries are exhausted.
+
+Future extension (out of current project scope): add Prometheus + Grafana in Kind for long-running dashboards, SLO tracking, and alerting.
 
 ### Real-time Queue Stats
 
@@ -389,6 +481,20 @@ kubectl get svc ttg-redis
 
 # Test connectivity from a pod
 kubectl run -it --rm debug --image=redis:7.2-alpine -- redis-cli -h ttg-redis ping
+```
+
+#### RabbitMQ Connectivity Issues
+
+```bash
+# Check RabbitMQ pod and service
+kubectl get pod ttg-rabbitmq
+kubectl get svc ttg-rabbitmq
+
+# Check broker health
+kubectl exec ttg-rabbitmq -- rabbitmq-diagnostics -q ping
+
+# Validate queue backend env in worker
+kubectl logs -l ttg.io/queue-backend=rabbitmq | grep -i "Queue Backend"
 ```
 
 #### Tasks Not Being Processed

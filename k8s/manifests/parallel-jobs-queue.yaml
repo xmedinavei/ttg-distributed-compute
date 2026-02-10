@@ -118,12 +118,18 @@ spec:
             # Enable queue mode
             - name: USE_QUEUE
               value: "true"
+            - name: QUEUE_BACKEND
+              value: "redis"
 
             # Redis connection (K8s service name)
             - name: REDIS_HOST
               value: "ttg-redis"
             - name: REDIS_PORT
               value: "6379"
+            - name: RABBITMQ_HOST
+              value: "ttg-rabbitmq"
+            - name: RABBITMQ_PORT
+              value: "5672"
 
             # Task configuration
             - name: TOTAL_PARAMETERS

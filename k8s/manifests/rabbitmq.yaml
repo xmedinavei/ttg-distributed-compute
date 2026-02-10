@@ -1,0 +1,111 @@
+# TTG RabbitMQ - Message Queue Backend for Milestone 3
+#
+# Deploy:
+#   kubectl apply -f k8s/manifests/rabbitmq.yaml
+#
+# Verify:
+#   kubectl get pod ttg-rabbitmq
+#   kubectl exec ttg-rabbitmq -- rabbitmq-diagnostics -q ping
+#
+# UI (Management):
+#   kubectl port-forward pod/ttg-rabbitmq 15672:15672
+#   open http://localhost:15672 (guest/guest)
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ttg-rabbitmq-data
+  labels:
+    app.kubernetes.io/name: ttg-rabbitmq
+    app.kubernetes.io/part-of: ttg-distributed-compute
+    ttg.io/project: distributed-compute
+    ttg.io/milestone: "3"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: standard
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ttg-rabbitmq
+  labels:
+    app.kubernetes.io/name: ttg-rabbitmq
+    app.kubernetes.io/component: queue
+    app.kubernetes.io/part-of: ttg-distributed-compute
+    ttg.io/project: distributed-compute
+    ttg.io/milestone: "3"
+    ttg.io/role: message-queue
+spec:
+  restartPolicy: Always
+  containers:
+    - name: rabbitmq
+      image: rabbitmq:3.13-management-alpine
+      imagePullPolicy: IfNotPresent
+      env:
+        - name: RABBITMQ_DEFAULT_USER
+          value: "guest"
+        - name: RABBITMQ_DEFAULT_PASS
+          value: "guest"
+      ports:
+        - containerPort: 5672
+          name: amqp
+          protocol: TCP
+        - containerPort: 15672
+          name: management
+          protocol: TCP
+      resources:
+        requests:
+          cpu: "200m"
+          memory: "256Mi"
+        limits:
+          cpu: "1000m"
+          memory: "1Gi"
+      livenessProbe:
+        exec:
+          command: ["rabbitmq-diagnostics", "-q", "ping"]
+        initialDelaySeconds: 20
+        periodSeconds: 15
+        timeoutSeconds: 5
+      readinessProbe:
+        exec:
+          command: ["rabbitmq-diagnostics", "-q", "check_running"]
+        initialDelaySeconds: 15
+        periodSeconds: 10
+        timeoutSeconds: 5
+      volumeMounts:
+        - name: rabbitmq-data
+          mountPath: /var/lib/rabbitmq
+  volumes:
+    - name: rabbitmq-data
+      persistentVolumeClaim:
+        claimName: ttg-rabbitmq-data
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ttg-rabbitmq
+  labels:
+    app.kubernetes.io/name: ttg-rabbitmq
+    app.kubernetes.io/part-of: ttg-distributed-compute
+    ttg.io/project: distributed-compute
+    ttg.io/milestone: "3"
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: ttg-rabbitmq
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: 5672
+      protocol: TCP
+    - name: management
+      port: 15672
+      targetPort: 15672
+      protocol: TCP
