@@ -16,11 +16,10 @@
 #   ./scripts/cleanup-ttg.sh [OPTIONS]
 #
 # OPTIONS:
-#   --all           Clean everything (cluster + images)
-#   --cluster       Remove Kind cluster only
-#   --pods          Remove demo pods only (keep cluster)
-#   --redis         Clear Redis data only
-#   --images        Remove TTG Docker images only
+#   --all           Clean TTG Kubernetes demo resources only
+#   --pods          Remove TTG pods/jobs only
+#   --redis         Clear Redis queue data in ttg-redis only
+#   --rabbitmq      Purge TTG RabbitMQ queues only
 #   --dry-run       Show what would be deleted (no changes)
 #   --force         Skip confirmation prompts
 #   --help          Show this help
@@ -62,16 +61,13 @@ FORCE=false
 
 # Safety patterns - resources we WILL touch
 TTG_CLUSTER_NAME="ttg-sandbox"
-TTG_IMAGE_PATTERN="ttg-worker"
 TTG_POD_LABELS=(
-    "app.kubernetes.io/name=ttg-worker"
     "ttg.io/project=distributed-compute"
-    "app=redis"
-    "app=redis-insight"
 )
 TTG_JOB_LABELS=(
     "ttg.io/project=distributed-compute"
 )
+PURGE_RABBITMQ=false
 
 # ┌──────────────────────────────────────────────────────────────────────────────┐
 # │                            HELPER FUNCTIONS                                   │
@@ -187,20 +183,7 @@ show_ttg_resources() {
         fi
     fi
     
-    # Docker images
-    echo ""
-    echo -e "  ${YELLOW}Docker Images (ttg-worker):${NC}"
-    local images=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep "$TTG_IMAGE_PATTERN" || echo "")
-    if [[ -n "$images" ]]; then
-        echo "$images" | while read img; do
-            echo "    • $img"
-        done
-        found_any=true
-    else
-        echo "    (none found)"
-    fi
-    
-    # Kind-related containers
+    # Kind-related containers (informational only)
     echo ""
     echo -e "  ${YELLOW}Kind Docker Containers:${NC}"
     local kind_containers=$(docker ps -a --format "{{.Names}}" | grep "$TTG_CLUSTER_NAME" || echo "")
@@ -294,53 +277,31 @@ clean_redis() {
 }
 
 clean_cluster() {
-    print_header "Removing Kind Cluster"
-    
-    if ! kind get clusters 2>/dev/null | grep -q "^${TTG_CLUSTER_NAME}$"; then
-        print_warning "Kind cluster '$TTG_CLUSTER_NAME' not found - skipping"
-        return
-    fi
-    
-    if [[ "$DRY_RUN" == "true" ]]; then
-        print_dry_run "Would delete Kind cluster: $TTG_CLUSTER_NAME"
-        
-        # Show what containers would be removed
-        containers=$(docker ps -a --format "{{.Names}}" | grep "$TTG_CLUSTER_NAME" || echo "")
-        if [[ -n "$containers" ]]; then
-            echo ""
-            echo "  Containers that would be removed:"
-            echo "$containers" | while read c; do
-                echo "    • $c"
-            done
-        fi
-    else
-        kind delete cluster --name $TTG_CLUSTER_NAME
-        print_success "Kind cluster removed!"
-    fi
+    print_warning "Cluster deletion is disabled in strict cleanup mode."
 }
 
 clean_images() {
-    print_header "Removing TTG Docker Images"
-    
-    images=$(docker images --format "{{.Repository}}:{{.Tag}} {{.ID}}" | grep "$TTG_IMAGE_PATTERN" || echo "")
-    
-    if [[ -z "$images" ]]; then
-        print_warning "No TTG images found - skipping"
+    print_warning "Docker image cleanup is disabled in strict cleanup mode."
+}
+
+clean_rabbitmq() {
+    print_header "Purging TTG RabbitMQ Queues"
+    if ! kubectl cluster-info --context kind-$TTG_CLUSTER_NAME &>/dev/null 2>&1; then
+        print_warning "Kind cluster not accessible - skipping RabbitMQ cleanup"
         return
     fi
-    
+    if ! kubectl get pod ttg-rabbitmq &>/dev/null 2>&1; then
+        print_warning "RabbitMQ pod not found - skipping"
+        return
+    fi
     if [[ "$DRY_RUN" == "true" ]]; then
-        echo "$images" | while read line; do
-            name=$(echo "$line" | awk '{print $1}')
-            print_dry_run "Would remove image: $name"
-        done
+        print_dry_run "Would purge queues: ttg.tasks, ttg.tasks.retry, ttg.tasks.dlq, ttg.results"
     else
-        echo "$images" | while read line; do
-            id=$(echo "$line" | awk '{print $2}')
-            name=$(echo "$line" | awk '{print $1}')
-            docker rmi "$id" 2>/dev/null && echo "  • Removed: $name" || echo "  • Failed to remove: $name (may be in use)"
-        done
-        print_success "TTG images cleaned!"
+        kubectl exec ttg-rabbitmq -- rabbitmqctl purge_queue ttg.tasks >/dev/null 2>&1 || true
+        kubectl exec ttg-rabbitmq -- rabbitmqctl purge_queue ttg.tasks.retry >/dev/null 2>&1 || true
+        kubectl exec ttg-rabbitmq -- rabbitmqctl purge_queue ttg.tasks.dlq >/dev/null 2>&1 || true
+        kubectl exec ttg-rabbitmq -- rabbitmqctl purge_queue ttg.results >/dev/null 2>&1 || true
+        print_success "RabbitMQ queues purged!"
     fi
 }
 
@@ -355,14 +316,9 @@ fi
 while [[ $# -gt 0 ]]; do
     case $1 in
         --all)
-            CLEAN_CLUSTER=true
             CLEAN_PODS=true
             CLEAN_REDIS=true
-            CLEAN_IMAGES=true
-            shift
-            ;;
-        --cluster)
-            CLEAN_CLUSTER=true
+            PURGE_RABBITMQ=true
             shift
             ;;
         --pods)
@@ -373,8 +329,8 @@ while [[ $# -gt 0 ]]; do
             CLEAN_REDIS=true
             shift
             ;;
-        --images)
-            CLEAN_IMAGES=true
+        --rabbitmq)
+            PURGE_RABBITMQ=true
             shift
             ;;
         --dry-run)
@@ -425,16 +381,12 @@ if [[ "$CLEAN_REDIS" == "true" ]]; then
     clean_redis
 fi
 
+if [[ "$PURGE_RABBITMQ" == "true" ]]; then
+    clean_rabbitmq
+fi
+
 if [[ "$CLEAN_PODS" == "true" ]]; then
     clean_pods
-fi
-
-if [[ "$CLEAN_CLUSTER" == "true" ]]; then
-    clean_cluster
-fi
-
-if [[ "$CLEAN_IMAGES" == "true" ]]; then
-    clean_images
 fi
 
 # Final summary

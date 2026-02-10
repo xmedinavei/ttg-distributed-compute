@@ -92,8 +92,8 @@ class RabbitMQTaskQueue:
                 self.connection = pika.BlockingConnection(self._connection_params())
                 self.channel = self.connection.channel()
                 self.channel.basic_qos(prefetch_count=1)
-                self._declare_topology()
                 self.connected = True
+                self._declare_topology()
                 logger.info("✅ Connected to RabbitMQ")
                 return True
             except AMQPConnectionError as exc:
@@ -197,7 +197,6 @@ class RabbitMQTaskQueue:
         del consumer_name, count  # Not needed with RabbitMQ basic_get
         self._ensure_connected()
 
-        # Use polling with short sleeps to mimic "blocking read".
         deadline = time.time() + (block_ms / 1000.0)
         while time.time() < deadline:
             method, properties, body = self.channel.basic_get(queue=self.task_queue, auto_ack=False)
@@ -222,10 +221,6 @@ class RabbitMQTaskQueue:
     def nack_task(self, message_id: str, task_data: Dict[str, Any], reason: str) -> bool:
         """
         Retry or dead-letter a failed task, then ACK the original message.
-
-        RabbitMQ retry policy:
-        - retry_count < max_retries: publish to retry queue (TTL then returns to main queue)
-        - retry_count >= max_retries: publish to DLQ
         """
         self._ensure_connected()
         retry_count = int(task_data.get("retry_count", 0))
@@ -268,7 +263,6 @@ class RabbitMQTaskQueue:
             )
             logger.error("Task %s moved to DLQ after retries: %s", updated.get("chunk_id"), reason)
 
-        # Remove original in-flight delivery
         return self.ack_task(message_id)
 
     def publish_result(
@@ -315,7 +309,7 @@ class RabbitMQTaskQueue:
         return {
             "backend": "rabbitmq",
             "tasks_total": int(task_info.method.message_count),
-            "tasks_pending": 0,  # Exact unacked count is best viewed in RabbitMQ UI.
+            "tasks_pending": 0,
             "results_count": int(result_info.method.message_count),
             "retry_count": int(retry_info.method.message_count),
             "dead_letter_count": int(dlq_info.method.message_count),
