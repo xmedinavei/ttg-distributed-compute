@@ -152,6 +152,8 @@ k8s/azure/aks-config.env
 # Local test results
 results/
 test-results/
+!docs/results/
+!docs/results/*.md
 
 # ============================================
 # Docker

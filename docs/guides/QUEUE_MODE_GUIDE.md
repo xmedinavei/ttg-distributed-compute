@@ -1,7 +1,7 @@
-# TTG Queue Mode Guide (Milestone 2)
+# TTG Queue Mode Guide (Milestones 2-3)
 
-**Version:** 1.2.1  
-**Status:** ✅ Implemented with Fault Tolerance  
+**Version:** 1.3.0  
+**Status:** ✅ Redis + RabbitMQ backends with Fault Tolerance  
 **Date:** February 2026
 
 ---
@@ -192,16 +192,22 @@ python scripts/aggregate_results.py --port 16379
 
 ### Environment Variables
 
-| Variable               | Default     | Description                                         |
-| ---------------------- | ----------- | --------------------------------------------------- |
-| `USE_QUEUE`            | `false`     | Enable queue mode (`true`) or static mode (`false`) |
-| `REDIS_HOST`           | `ttg-redis` | Redis server hostname                               |
-| `REDIS_PORT`           | `6379`      | Redis server port                                   |
-| `CHUNK_SIZE`           | `100`       | Parameters per task chunk                           |
-| `IDLE_TIMEOUT_SECONDS` | `30`        | Exit after this many seconds with no tasks          |
-| `WORKER_ID`            | `0`         | Unique worker identifier (set by K8s)               |
-| `TOTAL_PARAMS`         | `10000`     | Total parameters to process                         |
-| `SIMULATE_WORK_MS`     | `1`         | Milliseconds of simulated work per parameter        |
+| Variable               | Default        | Description                                         |
+| ---------------------- | -------------- | --------------------------------------------------- |
+| `USE_QUEUE`            | `false`        | Enable queue mode (`true`) or static mode (`false`) |
+| `QUEUE_BACKEND`        | `redis`        | Queue backend: `redis` or `rabbitmq` (M3)           |
+| `REDIS_HOST`           | `ttg-redis`    | Redis server hostname                               |
+| `REDIS_PORT`           | `6379`         | Redis server port                                   |
+| `RABBITMQ_HOST`        | `ttg-rabbitmq` | RabbitMQ server hostname (M3)                       |
+| `RABBITMQ_PORT`        | `5672`         | RabbitMQ AMQP port (M3)                             |
+| `RABBITMQ_MAX_RETRIES` | `3`            | Max retry attempts before dead-lettering (M3)       |
+| `RABBITMQ_RETRY_DELAY_MS` | `5000`     | Delay between retries in ms (M3)                    |
+| `CHUNK_SIZE`           | `100`          | Parameters per task chunk                           |
+| `IDLE_TIMEOUT_SECONDS` | `30`           | Exit after this many seconds with no tasks          |
+| `WORKER_ID`            | `0`            | Unique worker identifier (set by K8s)               |
+| `TOTAL_PARAMS`         | `10000`        | Total parameters to process                         |
+| `SIMULATE_WORK_MS`     | `1`            | Milliseconds of simulated work per parameter        |
+| `SIMULATE_FAULT_RATE`  | `0.0`          | Probability (0.0-1.0) a task fails (for testing retry/DLQ) |
 
 ### Redis Keys
 
@@ -223,6 +229,20 @@ python scripts/aggregate_results.py --port 16379
 ---
 
 ## Running Queue Mode
+
+### One-Command Demo (Recommended)
+
+Use the same script for both queue backends:
+
+```bash
+# Redis backend demo
+./scripts/run-demo.sh --backend redis --scale small --fault-demo --monitor both
+
+# RabbitMQ backend demo
+./scripts/run-demo.sh --backend rabbitmq --scale small --fault-demo --monitor both
+```
+
+This keeps demo operations consistent while you compare backends.
 
 ### Using kubectl
 
@@ -274,6 +294,21 @@ USE_QUEUE=true REDIS_HOST=localhost WORKER_ID=0 python src/worker.py
 ---
 
 ## Monitoring & Observability
+
+### Live Demo Monitoring by Backend
+
+- Redis backend:
+  - `python3 scripts/queue_monitor.py --total-params 10000`
+  - `python3 scripts/aggregate_results.py --port 6379`
+- RabbitMQ backend:
+  - `./scripts/rabbitmq_monitor.sh --watch 2`
+  - RabbitMQ UI: `kubectl port-forward pod/ttg-rabbitmq 15672:15672` then open `http://localhost:15672`
+
+Visual checkpoints for supervisor demos:
+- Queue depth decreases toward zero.
+- Active consumers match running workers.
+- Unacked messages return near zero by completion.
+- Retry/DLQ queues show expected behavior under failures.
 
 ### Real-time Queue Stats
 
@@ -407,16 +442,14 @@ kubectl exec ttg-redis -- redis-cli XGROUP DESTROY ttg:tasks ttg-workers
 ### Cleanup Commands
 
 ```bash
-# Delete job only (safe - keeps Redis data)
-kubectl delete job ttg-computation-queue
+# Strict TTG-only cleanup (recommended for shared machines)
+./scripts/cleanup-ttg.sh --all
 
-# Clear Redis data only (keeps job if running)
-kubectl exec ttg-redis -- redis-cli FLUSHALL
-
-# Full reset (job + data)
-kubectl delete job ttg-computation-queue
-kubectl exec ttg-redis -- redis-cli FLUSHALL
+# Preview only (no changes)
+./scripts/cleanup-ttg.sh --all --dry-run
 ```
+
+Safety note: cleanup scripts are configured to target only TTG project resources and avoid deleting unrelated Docker workloads.
 
 ---
 
@@ -686,11 +719,12 @@ For our simulated work (1ms/param), 100 is optimal.
 
 ## Version History
 
-| Version | Date     | Changes                                |
-| ------- | -------- | -------------------------------------- |
-| 1.2.0   | Feb 2026 | Initial queue mode implementation      |
-| 1.1.0   | Jan 2026 | Parallel Kubernetes jobs (static mode) |
-| 1.0.0   | Dec 2025 | Basic containerized worker             |
+| Version | Date     | Changes                                             |
+| ------- | -------- | --------------------------------------------------- |
+| 1.3.0   | Feb 2026 | RabbitMQ backend, dual-backend demo, M3 monitoring  |
+| 1.2.0   | Feb 2026 | Initial queue mode implementation (Redis Streams)   |
+| 1.1.0   | Jan 2026 | Parallel Kubernetes jobs (static mode)              |
+| 1.0.0   | Dec 2025 | Basic containerized worker                          |
 
 ---
 
@@ -700,3 +734,4 @@ For our simulated work (1ms/param), 100 is optimal.
 - [KUBERNETES_SETUP.md](../setup/KUBERNETES_SETUP.md) - Cluster setup guide
 - [CONFIGURATION_GUIDE.md](CONFIGURATION_GUIDE.md) - Environment variables
 - [TEST_RESULTS_M1_PARALLEL_JOBS.md](../results/TEST_RESULTS_M1_PARALLEL_JOBS.md) - Milestone 1 results
+- [TEST_RESULTS_M3_RABBITMQ_MONITORING.md](../results/TEST_RESULTS_M3_RABBITMQ_MONITORING.md) - Milestone 3 results (RabbitMQ)

@@ -2,7 +2,7 @@
 
 **Project Name:** TTG Distributed Computation on Kubernetes  
 **Owner:** TTG Team  
-**Last Updated:** 2026-02-03  
+**Last Updated:** 2026-02-09  
 **Overall Status:** 🟢 On Track
 
 ---
@@ -19,25 +19,24 @@ Distributed computation system using Kubernetes to process 10,000 parameters acr
 | --------------------- | ----------------------------------------------- | ----------- | --------------- | ------------------------------------------- |
 | **M1: Basic Setup**   | K8s cluster, worker container, parallel jobs    | ✅ Complete | 2026-01-27      | 3 workers, 10K params, 8s runtime           |
 | **M2: Message Queue** | Redis Streams, dynamic scaling, fault tolerance | ✅ Complete | 2026-02-03      | 100/100 chunks, 44s, fault tolerance proven |
-| **M3: Production**    | AKS deployment, monitoring, optimization        | ⏳ Future   | TBD             | Ready to start                              |
+| **M3: RabbitMQ Migration (Kind)** | Phased RabbitMQ backend + visual monitoring + reports | 🔄 In Progress | 2026-02-09 | Redis fallback kept during migration |
 
 ---
 
-## Current Sprint (Week of Feb 3-6) - ACCELERATED
+## Current Sprint (Week of Feb 9-13) - Milestone 3
 
-**Milestone 2: Message Queue Implementation (COMPLETE)**
+**Milestone 3: Phased RabbitMQ Migration (IN PROGRESS)**
 
-| Task                    | Status      | Owner | Due Date   | Notes                                     |
-| ----------------------- | ----------- | ----- | ---------- | ----------------------------------------- |
-| Redis deployment to K8s | ✅ Complete | Team  | 2026-02-03 | Pod + Service + PVC deployed              |
-| Queue utilities module  | ✅ Complete | Team  | 2026-02-03 | queue_utils.py with TaskQueue class       |
-| QueueWorker class       | ✅ Complete | Team  | 2026-02-03 | worker.py v1.2.1 with queue mode          |
-| Docker image v1.2.1     | ✅ Complete | Team  | 2026-02-03 | Built and loaded to Kind                  |
-| E2E integration test    | ✅ Complete | Team  | 2026-02-03 | 10K params, 3 workers, all results        |
-| Fault tolerance testing | ✅ Complete | Team  | 2026-02-03 | 100/100 chunks despite worker kill at 30% |
-| Monitoring setup        | ✅ Complete | Team  | 2026-02-03 | RedisInsight + CLI dashboard              |
-| Documentation           | ✅ Complete | Team  | 2026-02-03 | All docs updated                          |
-| Demo preparation        | ✅ Complete | Team  | 2026-02-03 | run-demo.sh --fault-demo ready            |
+| Task | Status | Owner | Due Date | Notes |
+| ---- | ------ | ----- | -------- | ----- |
+| RabbitMQ broker manifest in Kind | ✅ Complete | Team | 2026-02-09 | `k8s/manifests/rabbitmq.yaml` |
+| Worker backend toggle (`QUEUE_BACKEND`) | ✅ Complete | Team | 2026-02-09 | Redis + RabbitMQ phased path |
+| RabbitMQ retry + DLQ path | ✅ Complete | Team | 2026-02-09 | Main/retry/DLQ queues configured |
+| RabbitMQ job manifest | ✅ Complete | Team | 2026-02-09 | `parallel-jobs-queue-rabbitmq.yaml` |
+| Visual monitoring points (UI + CLI) | ✅ Complete | Team | 2026-02-09 | RabbitMQ UI + `rabbitmq_monitor.sh` |
+| Queue guide update | ✅ Complete | Team | 2026-02-09 | M3 section + future Prom/Grafana note |
+| M3 results report | ✅ Complete | Team | 2026-02-09 | New results document in `docs/results` |
+| Supervisor report + DOCX template | ✅ Complete | Team | 2026-02-09 | New tracking docs created |
 
 ---
 
@@ -108,7 +107,7 @@ Distributed computation system using Kubernetes to process 10,000 parameters acr
 - Kubernetes Jobs with indexed completions
 - Local kind cluster (sandbox environment)
 
-**Milestone 2 (80% Complete):**
+**Milestone 2 (Complete):**
 
 - ✅ Redis Streams for dynamic task distribution
 - ✅ Consumer groups for at-least-once delivery
@@ -168,9 +167,10 @@ Distributed computation system using Kubernetes to process 10,000 parameters acr
 
 ## Next Steps
 
-1. **Milestone 3 (Future):** Azure AKS deployment, production monitoring
-2. **Real algorithm integration** (when ready)
-3. **Persistent Redis storage** (if needed for production)
+1. Validate RabbitMQ run end-to-end with 10K parameters in Kind.
+2. Run controlled failure test and record retry/DLQ evidence.
+3. Keep Redis fallback path active until RabbitMQ path is fully accepted.
+4. (Future) Add Prometheus + Grafana dashboards in Kind.
 
 ---
 

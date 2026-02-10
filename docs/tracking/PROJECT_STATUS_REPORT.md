@@ -2,7 +2,7 @@
 
 ## Project Status Report
 
-**Report Date:** February 3, 2026  
+**Report Date:** February 9, 2026  
 **Project:** TTG Distributed Computation on Kubernetes  
 **Owner:** Xavier / TTG Team  
 **Overall Status:** 🟢 **ON TRACK**
@@ -11,7 +11,7 @@
 
 ## Executive Summary
 
-The TTG Distributed Computation System successfully processes 10,000+ parameters across multiple Kubernetes worker nodes. **Both Milestone 1 and Milestone 2 are now complete**, with a proven fault-tolerant message queue architecture using Redis Streams.
+The TTG Distributed Computation System successfully processes 10,000+ parameters across multiple Kubernetes worker nodes. **Milestone 1 and Milestone 2 are complete**, and **Milestone 3 has started** with a phased RabbitMQ migration in local Kind while keeping Redis fallback active.
 
 **Key Achievement:** When a worker is killed mid-processing, the remaining workers continue, and **100% of tasks complete** without data loss.
 
@@ -23,7 +23,7 @@ The TTG Distributed Computation System successfully processes 10,000+ parameters
 | --------------------- | ----------------------------------------------- | ----------- | ------------------ | -------------------------------------- |
 | **M1: Basic Setup**   | K8s cluster, worker container, parallel jobs    | ✅ Complete | 2026-01-27         | 3 workers, 10K params, 8s runtime      |
 | **M2: Message Queue** | Redis Streams, dynamic scaling, fault tolerance | ✅ Complete | 2026-02-03         | 100% completion despite worker failure |
-| **M3: Production**    | AKS deployment, monitoring, optimization        | ⏳ Planned  | Target: 2026-02-17 | 2-week sprint                          |
+| **M3: RabbitMQ (Kind)** | Phased RabbitMQ backend + visual monitoring + reporting | 🔄 In Progress | 2026-02-09 | Redis fallback preserved during migration |
 
 ---
 
@@ -117,6 +117,32 @@ The TTG Distributed Computation System successfully processes 10,000+ parameters
 - XCLAIM for recovering stale/failed tasks
 - Standalone pods (not managed by Job controller)
 - Message acknowledgment (XACK) for reliability
+
+---
+
+## Milestone 3: RabbitMQ Backend Migration (IN PROGRESS)
+
+**Start Date:** February 9, 2026
+
+### Deliverables Completed in This Step
+
+- ✅ RabbitMQ backend implementation added for queue workers (`QUEUE_BACKEND=rabbitmq`)
+- ✅ RabbitMQ queue topology defined: main queue, retry queue, dead-letter queue, results queue
+- ✅ RabbitMQ Kind manifests added (`rabbitmq.yaml`, `parallel-jobs-queue-rabbitmq.yaml`)
+- ✅ Visual monitoring path documented and script provided (`rabbitmq_monitor.sh`)
+- ✅ Queue guide updated with phased migration and fallback behavior
+- ✅ Supervisor-ready reporting artifacts generated (Markdown + DOCX-ready template)
+
+### Monitoring Points for Supervisor Demo
+
+- RabbitMQ Management UI (`http://localhost:15672`) for visual queue depth, consumers, unacked, and rates
+- CLI monitor (`./scripts/rabbitmq_monitor.sh --watch 2`) for repeatable evidence snapshots
+- Worker logs and pod states for execution proof and troubleshooting
+
+### Scope Clarification
+
+- AKS is out of scope for this milestone segment.
+- Prometheus + Grafana are intentionally deferred and documented as a future extension.
 
 ---
 
@@ -223,30 +249,29 @@ docs/
 
 ---
 
-## Next Steps: Milestone 3 Planning
+## Next Steps: Milestone 3 Execution
 
-**Target Start:** February 10, 2026  
+**Start:** February 9, 2026  
 **Target Completion:** February 24, 2026 (2-week sprint)
 
 ### Planned Deliverables
 
-| Task                                      | Priority | Estimated Effort |
-| ----------------------------------------- | -------- | ---------------- |
-| Azure AKS cluster setup                   | High     | 2 days           |
-| Azure Redis Cache integration             | High     | 1 day            |
-| Persistent Redis storage                  | Medium   | 1 day            |
-| CI/CD pipeline (GitHub Actions)           | Medium   | 3 days           |
-| Monitoring dashboard (Prometheus/Grafana) | Medium   | 2 days           |
-| Scale testing (100K+ parameters)          | High     | 2 days           |
-| Production documentation                  | Medium   | 1 day            |
+| Task | Priority | Estimated Effort |
+| ---- | -------- | ---------------- |
+| RabbitMQ E2E run validation in Kind | High | 1 day |
+| Retry/DLQ fault scenario validation | High | 1 day |
+| Monitoring evidence capture (UI + CLI) | High | 0.5 day |
+| Results report consolidation | Medium | 0.5 day |
+| Supervisor presentation rehearsal | Medium | 0.5 day |
+| Future planning: Prometheus/Grafana in Kind | Medium | 1 day |
 
 ### Success Criteria for M3
 
-- [ ] AKS cluster deployed and accessible
-- [ ] Workers processing tasks in Azure
-- [ ] Monitoring dashboard operational
-- [ ] CI/CD pipeline auto-deploying changes
-- [ ] 100K+ parameter scale test passed
+- [ ] RabbitMQ mode completes full workload in Kind
+- [ ] Retry queue and DLQ behavior validated with controlled fault
+- [ ] Visual monitoring evidence prepared for supervisor
+- [ ] Redis fallback remains operational
+- [ ] Future Prometheus/Grafana option documented
 
 ---
 

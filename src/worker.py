@@ -25,6 +25,7 @@ import os
 import sys
 import time
 import json
+import random
 import signal
 import hashlib
 from datetime import datetime, timezone
@@ -49,7 +50,7 @@ from logging_config import (
 # CONSTANTS
 # ═══════════════════════════════════════════════════════════════════════════
 
-VERSION = "1.2.0"  # Updated for Milestone 2
+VERSION = "1.3.0"  # Updated for Milestone 3 foundation
 PROJECT = "ttg-distributed-compute"
 
 
@@ -411,7 +412,7 @@ class DistributedWorker:
 
 class QueueWorker:
     """
-    Queue-based worker that pulls tasks from Redis Streams.
+    Queue-based worker that pulls tasks from a configured queue backend.
 
     Unlike DistributedWorker (which calculates a fixed range at startup),
     QueueWorker dynamically pulls tasks from a Redis queue. This provides:
@@ -428,12 +429,16 @@ class QueueWorker:
 
     Environment Variables:
         WORKER_ID: Unique worker identifier (0, 1, 2, ...)
+        QUEUE_BACKEND: redis|rabbitmq (default: redis)
         REDIS_HOST: Redis hostname (default: ttg-redis for K8s)
         REDIS_PORT: Redis port (default: 6379)
+        RABBITMQ_HOST: RabbitMQ hostname (default: ttg-rabbitmq)
+        RABBITMQ_PORT: RabbitMQ port (default: 5672)
         TOTAL_PARAMETERS: Total params to process (default: 10000)
         CHUNK_SIZE: Parameters per task chunk (default: 100)
         IDLE_TIMEOUT_SECONDS: Exit after this many seconds of no tasks (default: 30)
         SIMULATE_WORK_MS: Milliseconds to simulate per parameter (default: 1)
+        SIMULATE_FAULT_RATE: Probability (0.0-1.0) a chunk fails for testing retry/DLQ (default: 0.0)
     """
 
     def __init__(self):
@@ -458,9 +463,19 @@ class QueueWorker:
         self.pod_name = os.getenv('POD_NAME', self.hostname)
         self.node_name = os.getenv('NODE_NAME', 'unknown')
 
+        # Fault simulation: probabilistic task failure for testing retry/DLQ
+        # Set SIMULATE_FAULT_RATE=0.1 to fail ~10% of tasks (0.0 = disabled)
+        self.simulate_fault_rate = float(
+            os.getenv('SIMULATE_FAULT_RATE', '0.0'))
+
+        # Queue backend settings (phased migration: Redis remains fallback)
+        self.queue_backend = os.getenv('QUEUE_BACKEND', 'redis').strip().lower()
+
         # Redis connection settings
         self.redis_host = os.getenv('REDIS_HOST', 'ttg-redis')
         self.redis_port = int(os.getenv('REDIS_PORT', '6379'))
+        self.rabbitmq_host = os.getenv('RABBITMQ_HOST', 'ttg-rabbitmq')
+        self.rabbitmq_port = int(os.getenv('RABBITMQ_PORT', '5672'))
 
         # Statistics
         self.chunks_processed = 0
@@ -474,7 +489,7 @@ class QueueWorker:
         # Graceful shutdown handler
         self.killer = GracefulKiller(self.logger, self.lifecycle)
 
-        # Consumer name for Redis
+        # Consumer name for queue backend
         self.consumer_name = f"worker-{self.worker_id}"
 
         # Stale task recovery settings (Fault Tolerance)
@@ -490,8 +505,11 @@ class QueueWorker:
         config = {
             'worker_id': self.worker_id,
             'mode': 'queue',
+            'queue_backend': self.queue_backend,
             'redis_host': self.redis_host,
             'redis_port': self.redis_port,
+            'rabbitmq_host': self.rabbitmq_host,
+            'rabbitmq_port': self.rabbitmq_port,
             'total_parameters': self.total_parameters,
             'chunk_size': self.chunk_size,
             'idle_timeout_seconds': self.idle_timeout_seconds,
@@ -499,29 +517,40 @@ class QueueWorker:
             'consumer_name': self.consumer_name,
             'hostname': self.hostname,
             'pod_name': self.pod_name,
-            'node_name': self.node_name
+            'node_name': self.node_name,
+            'simulate_fault_rate': self.simulate_fault_rate
         }
         self.lifecycle.initialized(config)
 
-    def _connect_to_redis(self) -> bool:
+    def _connect_to_queue_backend(self) -> bool:
         """
-        Establish connection to Redis.
+        Establish connection to configured queue backend.
 
         Returns:
             True if connected successfully
         """
-        # Import here to avoid import error if redis not installed
+        if self.queue_backend == "rabbitmq":
+            from rabbitmq_queue import RabbitMQTaskQueue
+
+            self.queue = RabbitMQTaskQueue(
+                rabbitmq_host=self.rabbitmq_host,
+                rabbitmq_port=self.rabbitmq_port,
+            )
+            self.logger.info(
+                f"Connecting to RabbitMQ at {self.rabbitmq_host}:{self.rabbitmq_port}..."
+            )
+            return self.queue.connect(retry=True)
+
+        # Default backend: Redis
         from queue_utils import TaskQueue
 
         self.queue = TaskQueue(
             redis_host=self.redis_host,
             redis_port=self.redis_port
         )
-
         self.logger.info(
             f"Connecting to Redis at {self.redis_host}:{self.redis_port}..."
         )
-
         return self.queue.connect(retry=True)
 
     def _maybe_initialize_tasks(self):
@@ -607,6 +636,15 @@ class QueueWorker:
             f"📦 Processing chunk {chunk_id}: params {start_param}-{end_param} "
             f"({params_count} params)"
         )
+
+        # Fault simulation: raise an error with configured probability.
+        # This exercises the nack_task → retry → DLQ path for RabbitMQ
+        # and the stale-task recovery path for Redis.
+        if self.simulate_fault_rate > 0 and random.random() < self.simulate_fault_rate:
+            raise RuntimeError(
+                f"Simulated fault on chunk {chunk_id} "
+                f"(SIMULATE_FAULT_RATE={self.simulate_fault_rate})"
+            )
 
         chunk_start_time = time.perf_counter()
         results = []
@@ -795,20 +833,35 @@ class QueueWorker:
             # Got a task! Reset empty counter
             consecutive_empty = 0
 
-            # Process the chunk
-            result = self._process_chunk(task)
-            self.chunks_processed += 1
+            try:
+                # Process the chunk
+                result = self._process_chunk(task)
+                self.chunks_processed += 1
 
-            # Publish result to results stream
-            self.queue.publish_result(
-                chunk_id=task['chunk_id'],
-                worker_id=self.consumer_name,
-                result_data=result['result_summary'],
-                duration_seconds=result['duration_seconds']
-            )
+                # Publish result
+                self.queue.publish_result(
+                    chunk_id=task['chunk_id'],
+                    worker_id=self.consumer_name,
+                    result_data=result['result_summary'],
+                    duration_seconds=result['duration_seconds']
+                )
 
-            # Acknowledge the task (removes from pending)
-            self.queue.ack_task(task['message_id'])
+                # Acknowledge task
+                self.queue.ack_task(task['message_id'])
+            except Exception as task_error:
+                # RabbitMQ backend supports retry + DLQ via nack_task.
+                # Redis backend keeps task pending for stale-task recovery.
+                self.logger.error(
+                    f"Task {task.get('chunk_id', 'unknown')} failed: {task_error}",
+                    exc_info=True
+                )
+                if hasattr(self.queue, "nack_task"):
+                    self.queue.nack_task(
+                        message_id=task['message_id'],
+                        task_data=task,
+                        reason=str(task_error),
+                    )
+                continue
 
             # Log progress
             stats = self.queue.get_queue_stats()
@@ -833,6 +886,7 @@ class QueueWorker:
         return {
             'worker_id': self.worker_id,
             'mode': 'queue',
+            'queue_backend': self.queue_backend,
             'status': 'completed' if not self.killer.kill_now else 'interrupted',
             'chunks_processed': self.chunks_processed,
             'params_processed': self.params_processed,
@@ -841,6 +895,7 @@ class QueueWorker:
             'chunks_per_second': round(self.chunks_processed / duration, 2) if duration > 0 else 0,
             'consumer_name': self.consumer_name,
             'redis_host': self.redis_host,
+            'rabbitmq_host': self.rabbitmq_host,
             'hostname': self.hostname,
             'node_name': self.node_name,
             'queue_stats': queue_stats
@@ -858,9 +913,11 @@ class QueueWorker:
         # Print startup banner
         print_banner(f"TTG Queue Worker {self.worker_id} Starting", {
             'Version': VERSION,
-            'Mode': 'Queue (Redis Streams)',
+            'Mode': f"Queue ({self.queue_backend})",
             'Worker ID': self.worker_id,
+            'Queue Backend': self.queue_backend,
             'Redis': f"{self.redis_host}:{self.redis_port}",
+            'RabbitMQ': f"{self.rabbitmq_host}:{self.rabbitmq_port}",
             'Total Parameters': self.total_parameters,
             'Chunk Size': self.chunk_size,
             'Idle Timeout': f"{self.idle_timeout_seconds}s",
@@ -871,8 +928,8 @@ class QueueWorker:
         })
 
         try:
-            # Step 1: Connect to Redis
-            self._connect_to_redis()
+            # Step 1: Connect to queue backend
+            self._connect_to_queue_backend()
 
             # Step 2: Maybe initialize tasks (Worker 0 only)
             self._maybe_initialize_tasks()
@@ -938,6 +995,7 @@ def main():
     # Get config for early logging
     worker_id = int(os.getenv('WORKER_ID', '0'))
     use_queue = os.getenv('USE_QUEUE', 'false').lower() == 'true'
+    queue_backend = os.getenv('QUEUE_BACKEND', 'redis').lower()
 
     # Setup logging before anything else
     setup_logging(worker_id=worker_id)
@@ -946,8 +1004,10 @@ def main():
     # Log startup
     logger.info("=" * 70)
     logger.info(f"TTG Distributed Worker v{VERSION}")
-    logger.info(
-        f"Mode: {'QUEUE (Redis Streams)' if use_queue else 'STATIC (Range Partitioning)'}")
+    if use_queue:
+        logger.info(f"Mode: QUEUE ({queue_backend})")
+    else:
+        logger.info("Mode: STATIC (Range Partitioning)")
     logger.info(f"Timestamp: {datetime.now(timezone.utc).isoformat()}")
     logger.info(f"Hostname: {os.getenv('HOSTNAME', 'unknown')}")
     logger.info(f"Pod: {os.getenv('POD_NAME', 'unknown')}")
@@ -958,7 +1018,7 @@ def main():
         # Create appropriate worker based on mode
         with log_timing(logger, "worker_total_execution"):
             if use_queue:
-                logger.info("Starting in QUEUE mode (Milestone 2)")
+                logger.info("Starting in QUEUE mode (Milestone 2+)")
                 worker = QueueWorker()
             else:
                 logger.info("Starting in STATIC mode (Milestone 1)")

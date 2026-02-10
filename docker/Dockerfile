@@ -71,8 +71,11 @@ ENV PATH=/home/worker/.local/bin:$PATH \
 # MILESTONE 1 (Static Mode):
 #   WORKER_ID, TOTAL_WORKERS, TOTAL_PARAMETERS, BATCH_SIZE
 #
-# MILESTONE 2 (Queue Mode):
-#   USE_QUEUE=true, REDIS_HOST, REDIS_PORT, CHUNK_SIZE, IDLE_TIMEOUT_SECONDS
+# MILESTONE 2+ (Queue Mode):
+#   USE_QUEUE=true, QUEUE_BACKEND=redis|rabbitmq
+#   Redis: REDIS_HOST, REDIS_PORT
+#   RabbitMQ: RABBITMQ_HOST, RABBITMQ_PORT
+#   Shared: CHUNK_SIZE, IDLE_TIMEOUT_SECONDS
 #
 ENV WORKER_ID=0 \
     TOTAL_WORKERS=3 \
@@ -85,10 +88,16 @@ ENV WORKER_ID=0 \
     LOG_FORMAT=text \
     # Milestone 2: Queue mode settings
     USE_QUEUE=false \
+    QUEUE_BACKEND=redis \
     REDIS_HOST=ttg-redis \
     REDIS_PORT=6379 \
+    RABBITMQ_HOST=ttg-rabbitmq \
+    RABBITMQ_PORT=5672 \
+    RABBITMQ_MAX_RETRIES=3 \
+    RABBITMQ_RETRY_DELAY_MS=5000 \
     CHUNK_SIZE=100 \
-    IDLE_TIMEOUT_SECONDS=30
+    IDLE_TIMEOUT_SECONDS=30 \
+    SIMULATE_FAULT_RATE=0.0
 
 # Health check (optional, useful for deployments)
 # HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \

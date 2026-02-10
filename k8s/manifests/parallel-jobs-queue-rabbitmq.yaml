@@ -1,0 +1,120 @@
+# TTG Parallel Jobs - Queue Mode (RabbitMQ backend)
+#
+# Prerequisites:
+#   kubectl apply -f k8s/manifests/rabbitmq.yaml
+#   docker build -t ttg-worker:v1.3.0 -f docker/Dockerfile .
+#   kind load docker-image ttg-worker:v1.3.0 --name ttg-sandbox
+#
+# Deploy:
+#   kubectl apply -f k8s/manifests/parallel-jobs-queue-rabbitmq.yaml
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ttg-computation-queue-rabbitmq
+  labels:
+    app.kubernetes.io/name: ttg-worker
+    app.kubernetes.io/instance: ttg-computation-queue-rabbitmq
+    app.kubernetes.io/version: "1.3.0"
+    app.kubernetes.io/component: worker
+    app.kubernetes.io/part-of: ttg-distributed-compute
+    ttg.io/project: distributed-compute
+    ttg.io/milestone: "3"
+    ttg.io/mode: queue
+    ttg.io/queue-backend: rabbitmq
+spec:
+  completions: 3
+  parallelism: 3
+  completionMode: Indexed
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: ttg-worker
+        app.kubernetes.io/instance: ttg-computation-queue-rabbitmq
+        app.kubernetes.io/version: "1.3.0"
+        app.kubernetes.io/component: worker
+        app.kubernetes.io/part-of: ttg-distributed-compute
+        ttg.io/project: distributed-compute
+        ttg.io/mode: queue
+        ttg.io/queue-backend: rabbitmq
+    spec:
+      restartPolicy: Never
+      terminationGracePeriodSeconds: 60
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - ttg-worker
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: ttg-worker
+          image: ttg-worker:v1.3.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: USE_QUEUE
+              value: "true"
+            - name: QUEUE_BACKEND
+              value: "rabbitmq"
+            - name: RABBITMQ_HOST
+              value: "ttg-rabbitmq"
+            - name: RABBITMQ_PORT
+              value: "5672"
+            - name: RABBITMQ_USER
+              value: "guest"
+            - name: RABBITMQ_PASSWORD
+              value: "guest"
+            - name: RABBITMQ_MAX_RETRIES
+              value: "3"
+            - name: RABBITMQ_RETRY_DELAY_MS
+              value: "5000"
+            - name: TOTAL_PARAMETERS
+              value: "10000"
+            - name: CHUNK_SIZE
+              value: "100"
+            - name: IDLE_TIMEOUT_SECONDS
+              value: "30"
+            - name: SIMULATE_WORK_MS
+              value: "1"
+            - name: WORKER_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.annotations['batch.kubernetes.io/job-completion-index']
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: LOG_LEVEL
+              value: "INFO"
+            - name: LOG_FORMAT
+              value: "text"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            capabilities:
+              drop:
+                - ALL
