@@ -230,7 +230,7 @@ def build_page_2(doc):
                 "RabbitMQ backend,\nretry/DLQ, dual-mode",
                 "✅ Complete",
                 "Feb 9",
-                "25 p/s RabbitMQ,\n27 p/s Redis",
+                "256 p/s RabbitMQ,\n243 p/s Redis (10K)",
             ],
         ],
         col_widths=[1.3, 1.5, 0.9, 0.7, 1.5],
@@ -248,10 +248,10 @@ def build_page_2(doc):
             ["Architecture", "Static partitioning", "Redis Streams queue", "RabbitMQ AMQP queue"],
             ["Fault Tolerance", "❌ None", "✅ Verified (100/100\nat 30% kill)", "✅ Verified (100/100\nauto-requeue)"],
             ["Task Distribution", "Pre-calculated", "Dynamic (consumer\ngroups)", "Dynamic (basic_get\nprefetch=1)"],
-            ["Parameters Processed", "10,000", "10,000", "1,000 (demo)"],
+            ["Parameters Processed", "10,000", "10,000", "10,000"],
             ["Workers", "3 parallel", "3 queue-based", "3 queue-based"],
-            ["Execution Time", "~8 seconds", "~8s (44s with fault\ndemo)", "39s (49s with fault\ndemo)"],
-            ["Throughput", "1,250 params/sec", "1,276 params/sec", "25 params/sec (demo\nscale)"],
+            ["Execution Time", "~8 seconds", "~8s (44s with fault\ndemo)", "~39s (RMQ) / ~41s\n(Redis)"],
+            ["Throughput", "1,250 params/sec", "1,276 params/sec", "256 p/s (RMQ)\n243 p/s (Redis)"],
             ["Success Rate", "100%", "100%", "100%"],
             ["Retry / DLQ", "N/A", "XCLAIM recovery", "Retry queue + DLQ"],
         ],
@@ -378,6 +378,30 @@ def build_page_3(doc):
                 "20 p/s",
                 "ZERO",
             ],
+            [
+                "8",
+                "M3",
+                "Redis\nStreams",
+                "No",
+                "3",
+                "10,000",
+                "100/100",
+                "41s",
+                "243 p/s",
+                "ZERO",
+            ],
+            [
+                "9",
+                "M3",
+                "RabbitMQ",
+                "No",
+                "3",
+                "10,000",
+                "100/100",
+                "38s",
+                "256 p/s",
+                "ZERO",
+            ],
         ],
         col_widths=[0.35, 0.55, 0.7, 0.75, 0.55, 0.6, 0.6, 0.45, 0.7, 0.45],
     )
@@ -388,14 +412,18 @@ def build_page_3(doc):
     add_centered_heading(doc, "Key Takeaways", size=13)
 
     takeaways = [
-        "100% success rate across all 7 verified demo runs — no task was ever lost.",
+        "100% success rate across all 9 verified demo runs — no task was ever lost.",
         "Fault tolerance works on both backends: Redis recovers via XCLAIM; "
         "RabbitMQ auto-requeues unacked messages on worker disconnect.",
         "Throughput drops ~20-25% under fault (2 vs 3 workers) — expected and proportional.",
+        "At equal scale (10K params, medium preset), RabbitMQ (256 p/s) slightly "
+        "outperforms Redis Streams (243 p/s) — both backends are comparable.",
+        "Runs 4-7 used the 'small' preset (1K params, 100ms simulated work per chunk), "
+        "explaining the lower throughput vs. runs 1-3 and 8-9 (10ms per chunk).",
         "RabbitMQ adds retry queues and Dead Letter Queue (DLQ) for operational "
         "visibility not available with Redis alone.",
         "Both backends can be demoed with a single command: "
-        "./scripts/run-demo.sh --backend redis|rabbitmq",
+        "./scripts/run-demo.sh --backend redis|rabbitmq --scale small|medium",
     ]
     for t in takeaways:
         p = doc.add_paragraph()
