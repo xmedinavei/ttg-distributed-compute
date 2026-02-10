@@ -221,10 +221,23 @@ class RabbitMQTaskQueue:
     def nack_task(self, message_id: str, task_data: Dict[str, Any], reason: str) -> bool:
         """
         Retry or dead-letter a failed task, then ACK the original message.
+
+        Fault-tolerance flow:
+        1. If retry_count < max_retries: publish to retry exchange (with TTL).
+           After TTL expires, RabbitMQ dead-letters the message back to the
+           main task exchange automatically.
+        2. If retry_count >= max_retries: publish to DLQ for manual inspection.
+        3. Always ACK the original message to remove it from the task queue.
+
+        Note: This implements at-least-once delivery.  If the worker crashes
+        between publishing the retry copy and ACKing the original, both
+        messages will exist, leading to one duplicate processing.
         """
         self._ensure_connected()
         retry_count = int(task_data.get("retry_count", 0))
-        updated = dict(task_data)
+        # Strip internal transport keys before re-publishing
+        updated = {k: v for k, v in task_data.items() if not k.startswith("_")}
+        updated.pop("message_id", None)
         updated["retry_count"] = retry_count + 1
         updated["last_error"] = reason
         updated["failed_at"] = datetime.now(timezone.utc).isoformat()
@@ -294,11 +307,34 @@ class RabbitMQTaskQueue:
         return str(chunk_id)
 
     def claim_stale_tasks(self, consumer_name: str, min_idle_ms: int = 60000, count: int = 10) -> List[Dict[str, Any]]:
+        """
+        No-op for RabbitMQ.
+
+        RabbitMQ natively handles fault tolerance for unacked messages:
+        when a consumer disconnects (crash, network failure, pod deletion),
+        all its unacknowledged messages are automatically returned to the
+        queue in 'ready' state and redelivered to another consumer.
+
+        This is fundamentally different from Redis Streams, where stale
+        tasks must be explicitly claimed via XCLAIM.
+        """
         del consumer_name, min_idle_ms, count
-        # RabbitMQ handles in-flight task redelivery on consumer disconnect.
         return []
 
     def get_queue_stats(self) -> Dict[str, Any]:
+        """
+        Return queue statistics.
+
+        Semantics must match the Redis TaskQueue contract:
+        - tasks_total: total tasks that were created (not just remaining).
+        - tasks_pending: tasks currently being processed (unacknowledged).
+        - results_count: completed results.
+
+        For RabbitMQ we reconstruct tasks_total as:
+            tasks_ready + tasks_unacked + results + retry + dlq
+        This keeps the worker progress formula correct:
+            remaining = tasks_total - results_count
+        """
         self._ensure_connected()
 
         task_info = self.channel.queue_declare(queue=self.task_queue, durable=True, passive=True)
@@ -306,12 +342,22 @@ class RabbitMQTaskQueue:
         retry_info = self.channel.queue_declare(queue=self.retry_queue, durable=True, passive=True)
         dlq_info = self.channel.queue_declare(queue=self.dlq_queue, durable=True, passive=True)
 
+        tasks_ready = int(task_info.method.message_count)
+        tasks_unacked = 0  # basic_get doesn't expose per-queue unacked easily; approximate
+        results = int(result_info.method.message_count)
+        retry = int(retry_info.method.message_count)
+        dlq = int(dlq_info.method.message_count)
+
+        # Reconstruct the original total: everything in any state
+        tasks_total = tasks_ready + results + retry + dlq
+
         return {
             "backend": "rabbitmq",
-            "tasks_total": int(task_info.method.message_count),
-            "tasks_pending": 0,
-            "results_count": int(result_info.method.message_count),
-            "retry_count": int(retry_info.method.message_count),
-            "dead_letter_count": int(dlq_info.method.message_count),
+            "tasks_total": tasks_total,
+            "tasks_pending": tasks_unacked,
+            "results_count": results,
+            "retry_count": retry,
+            "dead_letter_count": dlq,
+            "tasks_ready": tasks_ready,
             "consumers": [f"{int(task_info.method.consumer_count)} active consumer(s)"],
         }

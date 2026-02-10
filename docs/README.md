@@ -91,8 +91,7 @@ _Project management, milestones, and status tracking._
 | [PROJECT_STATUS_REPORT.md](tracking/PROJECT_STATUS_REPORT.md) | **Project Manager report** (M1+M2 complete) - also available as [.docx](tracking/TTG_Project_Status_Report_M1_M2.docx) |
 | [PROJECT_OVERVIEW.md](tracking/PROJECT_OVERVIEW.md)           | High-level project overview, goals, and context                                                                        |
 | [PROJECT_TRACKER.md](tracking/PROJECT_TRACKER.md)             | Milestone tracking, sprint status, deliverables                                                                        |
-| [SUPERVISOR_REPORT_M3_RABBITMQ.md](tracking/SUPERVISOR_REPORT_M3_RABBITMQ.md) | Supervisor report for M3 phased migration |
-| [SUPERVISOR_REPORT_M3_RABBITMQ_DOCX_TEMPLATE.md](tracking/SUPERVISOR_REPORT_M3_RABBITMQ_DOCX_TEMPLATE.md) | DOCX-ready template for submission |
+| [SUPERVISOR_REPORT_M3_RABBITMQ.md](tracking/SUPERVISOR_REPORT_M3_RABBITMQ.md) | **Milestone 3 supervisor report** (RabbitMQ) - also available as [.docx](tracking/TTG_Project_Status_Report_M1_M2_M3.docx) |
 
 ---
 
@@ -146,9 +145,11 @@ docs/
 │
 └── tracking/                              # 📈 Project Status
     ├── PROJECT_OVERVIEW.md
-    └── PROJECT_TRACKER.md
+    ├── PROJECT_TRACKER.md
+    ├── SUPERVISOR_REPORT_M3_RABBITMQ.md
+    └── TTG_Project_Status_Report_M1_M2_M3.docx
 ```
 
 ---
 
-_Last Updated: February 3, 2026_
+_Last Updated: February 9, 2026_

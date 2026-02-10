@@ -96,7 +96,8 @@ ENV WORKER_ID=0 \
     RABBITMQ_MAX_RETRIES=3 \
     RABBITMQ_RETRY_DELAY_MS=5000 \
     CHUNK_SIZE=100 \
-    IDLE_TIMEOUT_SECONDS=30
+    IDLE_TIMEOUT_SECONDS=30 \
+    SIMULATE_FAULT_RATE=0.0
 
 # Health check (optional, useful for deployments)
 # HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \

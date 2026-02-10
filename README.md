@@ -31,18 +31,21 @@ A framework for running distributed computation workloads across a Kubernetes cl
 ```bash
 cd /home/xavierand_/Desktop/TTG
 
-# Run the full demo (handles setup, deployment, and cleanup)
-./scripts/run-demo.sh --scale small --fault-demo --monitor cli
+# RabbitMQ backend (Milestone 3)
+./scripts/run-demo.sh --backend rabbitmq --scale small --fault-demo --monitor both
+
+# Redis backend (Milestone 2)
+./scripts/run-demo.sh --backend redis --scale small --fault-demo --monitor both
 ```
 
 This will:
 
-1. Verify infrastructure is ready
-2. Deploy Redis and 3 workers
-3. Start 100 parameter chunks
-4. **Kill a worker at 30%** to demonstrate fault tolerance
-5. Show 100% completion despite failure
-6. Cleanup automatically
+1. Verify infrastructure is ready (Kind cluster, queue backend, Docker image)
+2. Deploy 3 workers connected to the selected queue backend
+3. Start 100 parameter chunks (1,000 params)
+4. **Kill a worker at ~30%** to demonstrate fault tolerance
+5. Show 100% completion despite failure (zero data loss)
+6. Prompt for cleanup (TTG resources only)
 
 ### Option B: Manual Setup (5 minutes)
 
@@ -97,15 +100,17 @@ kubectl logs -l app.kubernetes.io/name=ttg-worker -f
 ### 6. Clean Up
 
 ```bash
-# Preview what will be deleted
-./scripts/cleanup-all.sh --dry-run
+# Preview what will be deleted (safe, no changes)
+./scripts/cleanup-ttg.sh --all --dry-run
 
-# Delete job only (keep cluster for next run)
-./scripts/cleanup-all.sh --keep-cluster
+# Remove TTG worker pods + purge queues
+./scripts/cleanup-ttg.sh --pods --rabbitmq --force
 
-# Delete everything including cluster
-./scripts/cleanup-all.sh --force
+# Full TTG cleanup (pods + Redis + RabbitMQ)
+./scripts/cleanup-ttg.sh --all --force
 ```
+
+> **Safety:** `cleanup-ttg.sh` only touches TTG-labeled Kubernetes resources. Non-TTG Docker containers and databases are never affected.
 
 ---
 
@@ -130,13 +135,12 @@ kubectl logs <pod-name>                                        # Single pod logs
 kubectl get job ttg-computation                                # Job status
 
 # ══════════════════════════════════════════════════════════════
-# RESOURCES & CLEANUP
+# RESOURCES & CLEANUP (TTG-only, safe for shared machines)
 # ══════════════════════════════════════════════════════════════
-./scripts/list-resources.sh                       # View all TTG resources
-./scripts/cleanup-all.sh --dry-run                # Preview cleanup
-./scripts/cleanup-all.sh --keep-cluster           # Delete job, keep cluster
-./scripts/cleanup-all.sh --force                  # Delete everything
-kubectl delete job ttg-computation                # Quick job reset
+./scripts/cleanup-ttg.sh --all --dry-run          # Preview cleanup
+./scripts/cleanup-ttg.sh --pods --force           # Remove worker pods only
+./scripts/cleanup-ttg.sh --pods --rabbitmq --force # Pods + purge RabbitMQ
+./scripts/cleanup-ttg.sh --all --force            # Full TTG cleanup
 ```
 
 ---

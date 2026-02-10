@@ -25,6 +25,7 @@ import os
 import sys
 import time
 import json
+import random
 import signal
 import hashlib
 from datetime import datetime, timezone
@@ -437,6 +438,7 @@ class QueueWorker:
         CHUNK_SIZE: Parameters per task chunk (default: 100)
         IDLE_TIMEOUT_SECONDS: Exit after this many seconds of no tasks (default: 30)
         SIMULATE_WORK_MS: Milliseconds to simulate per parameter (default: 1)
+        SIMULATE_FAULT_RATE: Probability (0.0-1.0) a chunk fails for testing retry/DLQ (default: 0.0)
     """
 
     def __init__(self):
@@ -460,6 +462,11 @@ class QueueWorker:
         self.hostname = os.getenv('HOSTNAME', 'unknown')
         self.pod_name = os.getenv('POD_NAME', self.hostname)
         self.node_name = os.getenv('NODE_NAME', 'unknown')
+
+        # Fault simulation: probabilistic task failure for testing retry/DLQ
+        # Set SIMULATE_FAULT_RATE=0.1 to fail ~10% of tasks (0.0 = disabled)
+        self.simulate_fault_rate = float(
+            os.getenv('SIMULATE_FAULT_RATE', '0.0'))
 
         # Queue backend settings (phased migration: Redis remains fallback)
         self.queue_backend = os.getenv('QUEUE_BACKEND', 'redis').strip().lower()
@@ -510,7 +517,8 @@ class QueueWorker:
             'consumer_name': self.consumer_name,
             'hostname': self.hostname,
             'pod_name': self.pod_name,
-            'node_name': self.node_name
+            'node_name': self.node_name,
+            'simulate_fault_rate': self.simulate_fault_rate
         }
         self.lifecycle.initialized(config)
 
@@ -536,8 +544,13 @@ class QueueWorker:
         # Default backend: Redis
         from queue_utils import TaskQueue
 
-        self.queue = TaskQueue(redis_host=self.redis_host, redis_port=self.redis_port)
-        self.logger.info(f"Connecting to Redis at {self.redis_host}:{self.redis_port}...")
+        self.queue = TaskQueue(
+            redis_host=self.redis_host,
+            redis_port=self.redis_port
+        )
+        self.logger.info(
+            f"Connecting to Redis at {self.redis_host}:{self.redis_port}..."
+        )
         return self.queue.connect(retry=True)
 
     def _maybe_initialize_tasks(self):
@@ -623,6 +636,15 @@ class QueueWorker:
             f"📦 Processing chunk {chunk_id}: params {start_param}-{end_param} "
             f"({params_count} params)"
         )
+
+        # Fault simulation: raise an error with configured probability.
+        # This exercises the nack_task → retry → DLQ path for RabbitMQ
+        # and the stale-task recovery path for Redis.
+        if self.simulate_fault_rate > 0 and random.random() < self.simulate_fault_rate:
+            raise RuntimeError(
+                f"Simulated fault on chunk {chunk_id} "
+                f"(SIMULATE_FAULT_RATE={self.simulate_fault_rate})"
+            )
 
         chunk_start_time = time.perf_counter()
         results = []
@@ -824,11 +846,11 @@ class QueueWorker:
                     duration_seconds=result['duration_seconds']
                 )
 
-                # Acknowledge the task
+                # Acknowledge task
                 self.queue.ack_task(task['message_id'])
             except Exception as task_error:
-                # For RabbitMQ backend, retry/DLQ handling is supported via nack_task.
-                # For Redis backend, task remains pending and stale-recovery will reclaim it.
+                # RabbitMQ backend supports retry + DLQ via nack_task.
+                # Redis backend keeps task pending for stale-task recovery.
                 self.logger.error(
                     f"Task {task.get('chunk_id', 'unknown')} failed: {task_error}",
                     exc_info=True
@@ -996,7 +1018,7 @@ def main():
         # Create appropriate worker based on mode
         with log_timing(logger, "worker_total_execution"):
             if use_queue:
-                logger.info("Starting in QUEUE mode (Milestone 2)")
+                logger.info("Starting in QUEUE mode (Milestone 2+)")
                 worker = QueueWorker()
             else:
                 logger.info("Starting in STATIC mode (Milestone 1)")

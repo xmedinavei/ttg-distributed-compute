@@ -34,13 +34,81 @@
 - No Docker prune or global container/image deletion is required.
 - Existing non-TTG Docker workloads remain untouched.
 
-## Fill During Live Demo
+## Live Demo Results (February 9, 2026)
+
+### Run 1: No Fault Injection
 
 | Metric | Target | Observed |
 | --- | --- | --- |
-| Workers started | 3/3 | TODO |
-| Completed chunks | 100/100 | TODO |
-| Runtime (seconds) | record | TODO |
-| Throughput (params/sec) | record | TODO |
-| Retry queue behavior | expected on injected failure | TODO |
-| DLQ final state | expected for exhausted retries only | TODO |
+| Workers started | 3/3 | 3/3 |
+| Completed chunks | 100/100 | **100/100** |
+| Runtime (seconds) | record | **39s** |
+| Throughput (params/sec) | record | **25 params/sec** |
+| Retry queue (ttg.tasks.retry) | 0 | 0 |
+| DLQ (ttg.tasks.dlq) | 0 | 0 |
+| Results queue (ttg.results) | 100 | **100** |
+
+### Run 2: With Fault Injection (Worker Killed at ~36%)
+
+| Metric | Target | Observed |
+| --- | --- | --- |
+| Workers started | 3/3 | 3/3 |
+| Worker killed | 1 at ~30% | **1 at ~36%** |
+| Completed chunks | 100/100 | **100/100** |
+| Runtime (seconds) | record | **49s** |
+| Throughput (params/sec) | record | **20 params/sec** |
+| Retry queue (ttg.tasks.retry) | 0 | 0 |
+| DLQ (ttg.tasks.dlq) | 0 | 0 |
+| Results queue (ttg.results) | 100 | **100** |
+| Data loss | ZERO | **ZERO** |
+
+### Queue Stats After Completion
+
+```
+name               messages  consumers  messages_ready  messages_unacknowledged
+ttg.tasks.retry    0         0          0               0
+ttg.tasks.dlq      0         0          0               0
+ttg.tasks          0         0          0               0
+ttg.results        100       0          100             0
+```
+
+## Redis Backend Comparison (Same Hardware, Same Config)
+
+### Run 3: Redis, No Fault Injection
+
+| Metric | Result |
+| --- | --- |
+| Workers started | 3/3 |
+| Completed chunks | **100/100** |
+| Runtime (seconds) | **36s** |
+| Throughput (params/sec) | **27 params/sec** |
+
+### Run 4: Redis, With Fault Injection (Worker Killed at ~33%)
+
+| Metric | Result |
+| --- | --- |
+| Workers started | 3/3 |
+| Worker killed | 1 at ~33% |
+| Completed chunks | **100/100** |
+| Runtime (seconds) | **48s** |
+| Throughput (params/sec) | **20 params/sec** |
+| Data loss | **ZERO** (stale task recovery via XCLAIM) |
+
+## Backend Comparison Summary
+
+| Metric | Redis (no fault) | RabbitMQ (no fault) | Redis (fault) | RabbitMQ (fault) |
+| --- | --- | --- | --- | --- |
+| Chunks | 100/100 | 100/100 | 100/100 | 100/100 |
+| Runtime | 36s | 39s | 48s | 49s |
+| Throughput | 27 p/s | 25 p/s | 20 p/s | 20 p/s |
+| Recovery method | XCLAIM stale tasks | Auto-requeue on disconnect | XCLAIM | Auto-requeue |
+| DLQ | N/A | 0 | N/A | 0 |
+| Data loss | ZERO | ZERO | ZERO | ZERO |
+
+### Key Observations
+
+- Both backends achieve 100% completion with zero data loss, even under fault conditions.
+- Redis is slightly faster (~7-8%) due to lower protocol overhead (in-process vs AMQP).
+- RabbitMQ provides richer operational semantics (retry queues, DLQ, management UI).
+- Both recover from worker crashes automatically -- no manual intervention needed.
+- Throughput drop under fault is consistent (~25%) for both backends (expected: 2 vs 3 workers).
