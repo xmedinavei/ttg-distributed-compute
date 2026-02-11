@@ -215,12 +215,18 @@ kubectl logs -l ttg.io/project=distributed-compute --all-containers | grep "COMP
 Once you're done inspecting, clean up:
 
 ```bash
-# Preview what will be deleted
+# Preview what will be deleted (recommended first)
 ./scripts/cleanup-ttg.sh --all --dry-run
 
 # Clean everything
 ./scripts/cleanup-ttg.sh --all --force
 ```
+
+**What gets cleaned:** All TTG pods (RabbitMQ, Redis, workers), Redis data (FLUSHALL), and RabbitMQ TTG queues are removed.
+
+**What stays:** The Kind cluster (`ttg-sandbox`) and its node containers are **not** deleted — the script only lists them for context. Non-TTG Docker images (e.g. MongoDB, MCP) are never touched.
+
+**After full cleanup:** Run `./scripts/recover-infra.sh` (or your usual setup) before the next demo, since the RabbitMQ and Redis pods will be gone.
 
 ---
 
