@@ -30,7 +30,7 @@ BOLD='\033[1m'
 # Configuration
 IMAGE_NAME="ttg-worker"
 DEFAULT_VERSION="1.1.0"
-KIND_CLUSTER_NAME="ttg-cluster"
+KIND_CLUSTER_NAME="ttg-sandbox"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
