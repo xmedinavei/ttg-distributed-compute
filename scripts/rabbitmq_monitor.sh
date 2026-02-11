@@ -178,6 +178,37 @@ print_snapshot() {
 
     echo ""
 
+    # ── Fault Events (detect killed workers from CURRENT demo run only) ──
+    # Extract the run ID from current worker pods (e.g. "1770776579" from "ttg-worker-rabbitmq-1770776579-0")
+    local current_run_id=""
+    if [[ -n "$worker_pods" ]]; then
+        current_run_id=$(echo "$worker_pods" | head -1 | awk '{print $1}' | grep -oP 'ttg-worker-rabbitmq-\K[0-9]+' || true)
+    fi
+
+    if [[ -n "$current_run_id" ]]; then
+        local kill_events
+        kill_events=$(kubectl get events --field-selector reason=Killing --no-headers 2>/dev/null | grep "ttg-worker-.*${current_run_id}" || true)
+
+        if [[ -n "$kill_events" ]]; then
+            echo -e "  ${RED}${BOLD}⚠ FAULT EVENTS${NC}"
+            echo -e "  ${DIM}─────────────────────────────────────────────────────────${NC}"
+
+            while read -r evt_last evt_type evt_reason evt_object evt_message; do
+                # evt_object is like "pod/ttg-worker-rabbitmq-xxx-1"
+                local pod_name="${evt_object#pod/}"
+                echo -e "  ${RED}✗ ${pod_name}${NC} — killed ${evt_last} ago"
+            done <<< "$kill_events"
+
+            # Check if work still completed despite the kill
+            if [[ "$results" -gt 0 && "$total_tasks" -eq 0 ]]; then
+                echo -e "  ${GREEN}${BOLD}✓ FAULT TOLERANT${NC}${GREEN} — all ${results} chunks completed despite worker failure${NC}"
+            elif [[ "$total_tasks" -gt 0 ]]; then
+                echo -e "  ${YELLOW}⏳ Recovery in progress — ${results} done, ${total_tasks} remaining${NC}"
+            fi
+            echo ""
+        fi
+    fi
+
     # ── Worker Logs Summary (last progress/completion line per worker) ──
     if [[ -n "$worker_pods" ]]; then
         local has_logs=false

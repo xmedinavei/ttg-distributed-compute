@@ -87,6 +87,7 @@ The RabbitMQ monitor shows:
 - **Queue Status** -- message counts, consumer counts, ready/unacked per queue (only `ttg.*` queues)
 - **Progress Bar** -- visual completion percentage (results vs total chunks)
 - **Worker Status** -- each `ttg-worker-*` pod with its phase (Running/Completed/Error) and node
+- **Fault Events** -- if a worker was killed (fault injection), shows which pod was killed and whether the system recovered (auto-detected from Kubernetes events)
 - **Latest Worker Output** -- last progress/completed line from each worker's logs
 
 ### Web UI Monitoring (Optional)
