@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-Distributed computation system using Kubernetes to process 10,000 parameters across multiple worker nodes. Milestone 1 completed successfully with 3-worker parallel processing. **Milestone 2 (Message Queue) is 100% COMPLETE** with Redis Streams implemented, queue mode workers deployed, fault tolerance verified (100/100 chunks completed despite worker failure).
+Distributed computation system using Kubernetes to process 10,000 parameters across multiple worker nodes. Milestone 1 and Milestone 2 are complete. **Milestone 3 (RabbitMQ migration) is complete** with dual backend operation, retry/DLQ flow, verified fault tolerance, and medium-scale comparison runs.
 
 ---
 
@@ -19,13 +19,13 @@ Distributed computation system using Kubernetes to process 10,000 parameters acr
 | --------------------- | ----------------------------------------------- | ----------- | --------------- | ------------------------------------------- |
 | **M1: Basic Setup**   | K8s cluster, worker container, parallel jobs    | ✅ Complete | 2026-01-27      | 3 workers, 10K params, 8s runtime           |
 | **M2: Message Queue** | Redis Streams, dynamic scaling, fault tolerance | ✅ Complete | 2026-02-03      | 100/100 chunks, 44s, fault tolerance proven |
-| **M3: RabbitMQ Migration (Kind)** | Phased RabbitMQ backend + visual monitoring + reports | 🔄 In Progress | 2026-02-09 | Redis fallback kept during migration |
+| **M3: RabbitMQ Migration (Kind)** | RabbitMQ backend + visual monitoring + reports | ✅ Complete | 2026-02-09 | Redis fallback retained as rollback-safe path |
 
 ---
 
 ## Current Sprint (Week of Feb 9-13) - Milestone 3
 
-**Milestone 3: Phased RabbitMQ Migration (IN PROGRESS)**
+**Milestone 3: Phased RabbitMQ Migration (COMPLETE)**
 
 | Task | Status | Owner | Due Date | Notes |
 | ---- | ------ | ----- | -------- | ----- |
@@ -167,10 +167,10 @@ Distributed computation system using Kubernetes to process 10,000 parameters acr
 
 ## Next Steps
 
-1. Validate RabbitMQ run end-to-end with 10K parameters in Kind.
-2. Run controlled failure test and record retry/DLQ evidence.
-3. Keep Redis fallback path active until RabbitMQ path is fully accepted.
-4. (Future) Add Prometheus + Grafana dashboards in Kind.
+1. Keep Redis fallback path active while RabbitMQ remains primary M3 path.
+2. Add Prometheus + Grafana dashboards in Kind for richer observability.
+3. Run larger scale tests (100K+ params) to profile queue overhead and tuning.
+4. Prepare AKS production hardening plan.
 
 ---
 

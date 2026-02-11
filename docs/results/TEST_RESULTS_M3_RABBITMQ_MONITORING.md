@@ -14,11 +14,15 @@
 ## Validation Commands
 
 ```bash
-# Redis demo
+# Redis demo (fault tolerance)
 ./scripts/run-demo.sh --backend redis --scale small --fault-demo --monitor both
 
-# RabbitMQ demo
+# RabbitMQ demo (fault tolerance)
 ./scripts/run-demo.sh --backend rabbitmq --scale small --fault-demo --monitor both
+
+# Medium-scale comparison (same workload for both backends)
+./scripts/run-demo.sh --backend redis --scale medium --monitor both
+./scripts/run-demo.sh --backend rabbitmq --scale medium --monitor both
 ```
 
 ## RabbitMQ Monitoring Checkpoints
@@ -105,10 +109,21 @@ ttg.results        100       0          100             0
 | DLQ | N/A | 0 | N/A | 0 |
 | Data loss | ZERO | ZERO | ZERO | ZERO |
 
+## Medium-Scale Comparison (Added Validation, 10K params)
+
+| Metric | Redis (medium, no fault) | RabbitMQ (medium, no fault) |
+| --- | --- | --- |
+| Chunks | 100/100 | 100/100 |
+| Runtime | 41s | 38-39s |
+| Throughput | 243 p/s | 256-263 p/s |
+| Data loss | ZERO | ZERO |
+| Notes | Redis Streams consumer-group flow | RabbitMQ basic_get + ack flow |
+
 ### Key Observations
 
 - Both backends achieve 100% completion with zero data loss, even under fault conditions.
-- Redis is slightly faster (~7-8%) due to lower protocol overhead (in-process vs AMQP).
+- At equal medium scale (10K params), RabbitMQ is slightly faster in this environment (256-263 p/s vs 243 p/s).
 - RabbitMQ provides richer operational semantics (retry queues, DLQ, management UI).
 - Both recover from worker crashes automatically -- no manual intervention needed.
 - Throughput drop under fault is consistent (~25%) for both backends (expected: 2 vs 3 workers).
+- The earlier 1K "small" runs show lower throughput because `SIMULATE_WORK_MS=100` for small, while medium uses `SIMULATE_WORK_MS=10`.

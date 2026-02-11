@@ -2,6 +2,9 @@
 
 ## Project Status Report
 
+> Note: This document is a historical M1+M2 baseline snapshot.  
+> For current M3 status and validated medium-scale metrics, see `SUPERVISOR_REPORT_M3_RABBITMQ.md` and `TTG_Project_Status_Report_M1_M2_M3.docx`.
+
 **Report Date:** February 9, 2026  
 **Project:** TTG Distributed Computation on Kubernetes  
 **Owner:** Xavier / TTG Team  
@@ -11,7 +14,7 @@
 
 ## Executive Summary
 
-The TTG Distributed Computation System successfully processes 10,000+ parameters across multiple Kubernetes worker nodes. **Milestone 1 and Milestone 2 are complete**, and **Milestone 3 has started** with a phased RabbitMQ migration in local Kind while keeping Redis fallback active.
+The TTG Distributed Computation System successfully processes 10,000+ parameters across multiple Kubernetes worker nodes. **Milestones 1, 2, and 3 are complete**, with RabbitMQ added as a production-grade queue backend while keeping Redis fallback active.
 
 **Key Achievement:** When a worker is killed mid-processing, the remaining workers continue, and **100% of tasks complete** without data loss.
 
@@ -23,7 +26,7 @@ The TTG Distributed Computation System successfully processes 10,000+ parameters
 | --------------------- | ----------------------------------------------- | ----------- | ------------------ | -------------------------------------- |
 | **M1: Basic Setup**   | K8s cluster, worker container, parallel jobs    | ✅ Complete | 2026-01-27         | 3 workers, 10K params, 8s runtime      |
 | **M2: Message Queue** | Redis Streams, dynamic scaling, fault tolerance | ✅ Complete | 2026-02-03         | 100% completion despite worker failure |
-| **M3: RabbitMQ (Kind)** | Phased RabbitMQ backend + visual monitoring + reporting | 🔄 In Progress | 2026-02-09 | Redis fallback preserved during migration |
+| **M3: RabbitMQ (Kind)** | RabbitMQ backend + visual monitoring + reporting | ✅ Complete | 2026-02-09 | Redis fallback preserved as rollback-safe path |
 
 ---
 
@@ -120,7 +123,7 @@ The TTG Distributed Computation System successfully processes 10,000+ parameters
 
 ---
 
-## Milestone 3: RabbitMQ Backend Migration (IN PROGRESS)
+## Milestone 3: RabbitMQ Backend Migration (COMPLETE)
 
 **Start Date:** February 9, 2026
 

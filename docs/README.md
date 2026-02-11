@@ -88,10 +88,10 @@ _Project management, milestones, and status tracking._
 
 | Document                                                      | Description                                                                                                            |
 | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| [PROJECT_STATUS_REPORT.md](tracking/PROJECT_STATUS_REPORT.md) | **Project Manager report** (M1+M2 complete) - also available as [.docx](tracking/TTG_Project_Status_Report_M1_M2.docx) |
+| [PROJECT_STATUS_REPORT.md](tracking/PROJECT_STATUS_REPORT.md) | **Project Manager report** (historical M1+M2 baseline) - also available as [.docx](tracking/TTG_Project_Status_Report_M1_M2.docx) |
 | [PROJECT_OVERVIEW.md](tracking/PROJECT_OVERVIEW.md)           | High-level project overview, goals, and context                                                                        |
 | [PROJECT_TRACKER.md](tracking/PROJECT_TRACKER.md)             | Milestone tracking, sprint status, deliverables                                                                        |
-| [SUPERVISOR_REPORT_M3_RABBITMQ.md](tracking/SUPERVISOR_REPORT_M3_RABBITMQ.md) | **Milestone 3 supervisor report** (RabbitMQ) - also available as [.docx](tracking/TTG_Project_Status_Report_M1_M2_M3.docx) |
+| [SUPERVISOR_REPORT_M3_RABBITMQ.md](tracking/SUPERVISOR_REPORT_M3_RABBITMQ.md) | **Milestone 3 supervisor report** (RabbitMQ + medium-scale comparison) - also available as [.docx](tracking/TTG_Project_Status_Report_M1_M2_M3.docx) |
 
 ---
 

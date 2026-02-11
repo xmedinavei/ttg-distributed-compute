@@ -34,7 +34,7 @@ All 100 task chunks complete with **zero data loss** on both backends, even when
 
 ## Test Results
 
-### Backend Comparison (Same Hardware, Same Config)
+### Backend Comparison (small scale, fault-focused demo)
 
 | Metric | Redis (no fault) | RabbitMQ (no fault) | Redis (fault) | RabbitMQ (fault) |
 |---|---|---|---|---|
@@ -43,6 +43,15 @@ All 100 task chunks complete with **zero data loss** on both backends, even when
 | Throughput | 27 p/s | 25 p/s | 20 p/s | 20 p/s |
 | Recovery | XCLAIM stale tasks | Auto-requeue | XCLAIM | Auto-requeue |
 | Data loss | ZERO | ZERO | ZERO | ZERO |
+
+### Medium-Scale Comparison (10K params, no fault)
+
+| Metric | Redis (medium) | RabbitMQ (medium) |
+|---|---|---|
+| Chunks | 100/100 | 100/100 |
+| Runtime | 41s | 38-39s |
+| Throughput | 243 p/s | 256-263 p/s |
+| Data loss | ZERO | ZERO |
 
 ### RabbitMQ Queue Stats (After Completion)
 
@@ -75,6 +84,10 @@ All 100 task chunks complete with **zero data loss** on both backends, even when
 
 # Redis demo for comparison
 ./scripts/run-demo.sh --backend redis --scale small --fault-demo --monitor both
+
+# Medium-scale throughput comparison (default for performance checks)
+./scripts/run-demo.sh --backend redis --scale medium --monitor both
+./scripts/run-demo.sh --backend rabbitmq --scale medium --monitor both
 
 # Safe cleanup (TTG resources only)
 ./scripts/cleanup-ttg.sh --all --force

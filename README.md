@@ -1,27 +1,27 @@
 # TTG - Distributed Computation on Kubernetes
 
-[![Status](https://img.shields.io/badge/status-milestone_2_complete-brightgreen.svg)]()
-[![Version](https://img.shields.io/badge/version-1.2.1-blue.svg)]()
+[![Status](https://img.shields.io/badge/status-milestone_3_complete-brightgreen.svg)]()
+[![Version](https://img.shields.io/badge/version-1.3.0-blue.svg)]()
 [![Kubernetes](https://img.shields.io/badge/kubernetes-1.27+-blue.svg)]()
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)]()
 [![Fault Tolerant](https://img.shields.io/badge/fault_tolerant-verified-success.svg)]()
 
 A framework for running distributed computation workloads across a Kubernetes cluster. Designed to accelerate parameter-heavy algorithms by distributing work across multiple worker nodes.
 
-> **📊 Latest Test (Milestone 2):** 100/100 chunks completed in 44 seconds (22 params/sec) despite worker killed at 30%  
+> **📊 Latest Test (Milestone 3, medium scale):** RabbitMQ 100/100 chunks in 38-39s (256-263 params/sec), Redis 100/100 in 41s (243 params/sec)  
 > **✅ Fault tolerance VERIFIED**
 
-## 🎉 Milestone 2 Complete!
+## 🎉 Milestone 3 Complete
 
-**Queue-Based Architecture with Fault Tolerance**
+**Dual-backend queue architecture with fault tolerance (Redis + RabbitMQ)**
 
-| Metric              | Result          |
-| ------------------- | --------------- |
-| Chunks Completed    | 100/100 (100%)  |
-| Workers Deployed    | 3               |
-| Worker Killed At    | 30% progress    |
-| Total Time          | 44 seconds      |
-| Throughput          | 22 params/sec   |
+| Metric | Result |
+| --- | --- |
+| Chunks Completed | 100/100 (100%) on both backends |
+| Workers Deployed | 3 |
+| Medium Scale (10K) | RabbitMQ: 38-39s (256-263 p/s), Redis: 41s (243 p/s) |
+| Fault Demo (small) | RabbitMQ: 49s (20 p/s), Redis: 48s (20 p/s) |
+| Data Loss | ZERO |
 | **Fault Tolerance** | ✅ **VERIFIED** |
 
 ## 🚀 Quick Start
@@ -31,18 +31,21 @@ A framework for running distributed computation workloads across a Kubernetes cl
 ```bash
 cd /home/xavierand_/Desktop/TTG
 
-# RabbitMQ backend (Milestone 3)
-./scripts/run-demo.sh --backend rabbitmq --scale small --fault-demo --monitor both
+# RabbitMQ backend (Milestone 3 default)
+./scripts/run-demo.sh --backend rabbitmq --scale medium --monitor both
 
-# Redis backend (Milestone 2)
-./scripts/run-demo.sh --backend redis --scale small --fault-demo --monitor both
+# Redis backend comparison
+./scripts/run-demo.sh --backend redis --scale medium --monitor both
+
+# Fault tolerance demo (small scale, kill one worker)
+./scripts/run-demo.sh --backend rabbitmq --scale small --fault-demo --monitor both
 ```
 
 This will:
 
 1. Verify infrastructure is ready (Kind cluster, queue backend, Docker image)
 2. Deploy 3 workers connected to the selected queue backend
-3. Start 100 parameter chunks (1,000 params)
+3. Start 100 parameter chunks (medium: 10,000 params; small: 1,000 params)
 4. **Kill a worker at ~30%** to demonstrate fault tolerance
 5. Show 100% completion despite failure (zero data loss)
 6. Prompt for cleanup (TTG resources only)
@@ -68,7 +71,7 @@ cd /home/xavierand_/Desktop/TTG
 
 ```bash
 # Build with version and load into kind cluster
-./scripts/build.sh --version 1.1.0 --load-kind
+./scripts/build.sh --version 1.3.0 --load-kind
 ```
 
 ### 3. Deploy Workers
@@ -114,7 +117,7 @@ kubectl logs -l app.kubernetes.io/name=ttg-worker -f
 
 ---
 
-## � Quick Reference
+## Quick Reference
 
 Copy-paste commands for daily use:
 
@@ -153,7 +156,7 @@ kubectl get job ttg-computation                                # Job status
 |----------|---------------|
 | **Quick Start** | [SUPERVISOR_REPORT.md](SUPERVISOR_REPORT.md) - Executive summary |
 | **Guides** | [Queue Mode Guide](docs/guides/QUEUE_MODE_GUIDE.md) ・ [Configuration](docs/guides/CONFIGURATION_GUIDE.md) |
-| **Results** | [M2 Fault Tolerance](docs/results/TEST_RESULTS_M2_FAULT_TOLERANCE.md) ・ [M1 Parallel Jobs](docs/results/TEST_RESULTS_M1_PARALLEL_JOBS.md) |
+| **Results** | [M3 RabbitMQ + Monitoring](docs/results/TEST_RESULTS_M3_RABBITMQ_MONITORING.md) ・ [M2 Fault Tolerance](docs/results/TEST_RESULTS_M2_FAULT_TOLERANCE.md) ・ [M1 Parallel Jobs](docs/results/TEST_RESULTS_M1_PARALLEL_JOBS.md) |
 | **Setup** | [Local K8s](docs/setup/KUBERNETES_SETUP.md) ・ [Azure AKS](docs/setup/AZURE_AKS_GUIDE.md) |
 | **Knowledge** | [Kubernetes Explained](docs/knowledge/KUBERNETES_EXPLAINED.md) ・ [Kind Tutorial](docs/knowledge/KIND_EXPLAINED.md) |
 | **Tracking** | [Project Tracker](docs/tracking/PROJECT_TRACKER.md) ・ [Overview](docs/tracking/PROJECT_OVERVIEW.md) |
@@ -165,8 +168,9 @@ kubectl get job ttg-computation                                # Job status
 ```
 TTG/
 ├── src/                          # Source code
-│   ├── worker.py                 # Main worker (v1.2.1 with queue mode)
-│   ├── queue_utils.py            # Redis Streams wrapper
+│   ├── worker.py                 # Main worker (v1.3.0, dual backend)
+│   ├── queue_utils.py            # Redis Streams queue wrapper
+│   ├── rabbitmq_queue.py         # RabbitMQ queue wrapper (retry + DLQ)
 │   └── logging_config.py         # Structured logging infrastructure
 │
 ├── docker/
@@ -176,7 +180,10 @@ TTG/
 │   ├── manifests/
 │   │   ├── parallel-jobs.yaml           # M1 static mode
 │   │   ├── redis.yaml                   # Redis deployment
-│   │   └── parallel-workers-standalone.yaml  # M2 queue mode
+│   │   ├── rabbitmq.yaml                # RabbitMQ deployment + service
+│   │   ├── parallel-jobs-queue.yaml     # Redis queue mode
+│   │   ├── parallel-jobs-queue-rabbitmq.yaml # RabbitMQ queue mode
+│   │   └── parallel-workers-standalone.yaml  # M2 fault-tolerance demo
 │   ├── local/
 │   │   ├── kind-config.yaml      # Kind cluster configuration
 │   │   └── setup-local.sh        # Cluster setup script
@@ -213,9 +220,9 @@ TTG/
 
 You have **10 million parameters** to calculate. Running sequentially takes forever.
 
-### The Solution (Milestone 2 - Queue Mode)
+### The Solution (Milestone 3 - Dual Queue Mode)
 
-Workers dynamically pull tasks from a Redis queue:
+Workers dynamically pull tasks from Redis Streams or RabbitMQ:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -232,8 +239,8 @@ Workers dynamically pull tasks from a Redis queue:
 │         └────────────────┼────────────────┘                 │
 │                          │                                  │
 │                    ┌─────▼─────┐                            │
-│                    │   REDIS   │                            │
-│                    │  Streams  │                            │
+│                    │ REDIS or  │                            │
+│                    │ RabbitMQ  │                            │
 │                    └───────────┘                            │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
@@ -256,9 +263,12 @@ Workers dynamically pull tasks from a Redis queue:
 | `SIMULATE_WORK_MS` | 1         | Simulated work time per parameter |
 | `LOG_LEVEL`        | INFO      | DEBUG, INFO, WARNING, ERROR       |
 | `LOG_FORMAT`       | text      | text (human) or json (machine)    |
-| `QUEUE_MODE`       | false     | Enable queue mode (M2)            |
+| `QUEUE_MODE`       | false     | Enable queue mode                  |
+| `QUEUE_BACKEND`    | redis     | Queue backend: redis or rabbitmq   |
 | `REDIS_HOST`       | ttg-redis | Redis service hostname            |
 | `REDIS_PORT`       | 6379      | Redis port                        |
+| `RABBITMQ_HOST`    | ttg-rabbitmq | RabbitMQ service hostname      |
+| `RABBITMQ_PORT`    | 5672      | RabbitMQ AMQP port                |
 
 ### Kubernetes Resources
 
@@ -322,9 +332,9 @@ See [docs/setup/KUBERNETES_SETUP.md](docs/setup/KUBERNETES_SETUP.md) for detaile
 
 ---
 
-## 📊 Future Enhancements (Post Milestone 1)
+## 📊 Future Enhancements (Post Milestone 3)
 
-- [ ] **Message Queue**: Add Redis/RabbitMQ for dynamic work distribution
+- [x] **Message Queue**: Redis Streams + RabbitMQ dual-backend support complete
 - [ ] **Checkpointing**: Save progress for fault tolerance
 - [ ] **Result Aggregation**: Collect and combine worker outputs
 - [ ] **Observability**: Add Prometheus metrics and Grafana dashboards
@@ -384,4 +394,4 @@ MIT License - See LICENSE file for details.
 
 ---
 
-_Last Updated: 2026-01-27 | Version: 1.1.0 | Milestone 1: ✅ Complete_
+_Last Updated: 2026-02-09 | Version: 1.3.0 | Milestone 3: ✅ Complete_
