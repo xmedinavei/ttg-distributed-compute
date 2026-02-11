@@ -54,6 +54,7 @@ _Educational content and tutorials for newcomers._
 
 | Document                                                     | Description                                                     |
 | ------------------------------------------------------------ | --------------------------------------------------------------- |
+| [PROJECT_EXPLAINED.md](knowledge/PROJECT_EXPLAINED.md)       | **Full project explanation** - problem, objective, purpose, technologies, file-by-file guide |
 | [KIND_EXPLAINED.md](knowledge/KIND_EXPLAINED.md)             | Tutorial: What is Kind? How to use it for local K8s development |
 | [KUBERNETES_EXPLAINED.md](knowledge/KUBERNETES_EXPLAINED.md) | Tutorial: Kubernetes concepts explained for beginners           |
 
@@ -131,6 +132,7 @@ docs/
 │   └── QUEUE_MODE_GUIDE.md
 │
 ├── knowledge/                             # 🎓 Concepts & Tutorials
+│   ├── PROJECT_EXPLAINED.md
 │   ├── KIND_EXPLAINED.md
 │   └── KUBERNETES_EXPLAINED.md
 │
@@ -152,4 +154,20 @@ docs/
 
 ---
 
-_Last Updated: February 9, 2026_
+## 📦 AME-UP Final Deliverables
+
+_Consolidated deliverables for the AME-UP final submission (February 14, 2026)._
+
+| Document | Deliverable | Format |
+| -------- | ----------- | ------ |
+| [D1_Optimization_Performance_Report](../deliverables/D1_Optimization_Performance_Report.md) | Deliverable 1: Optimization & Performance Report | [.md](../deliverables/D1_Optimization_Performance_Report.md) / [.docx](../deliverables/docx/D1_Optimization_Performance_Report.docx) |
+| [D2_Technical_Artifacts_Index](../deliverables/D2_Technical_Artifacts_Index.md) | Deliverable 2: Technical Artifacts & Configurations | [.md](../deliverables/D2_Technical_Artifacts_Index.md) / [.docx](../deliverables/docx/D2_Technical_Artifacts_Index.docx) |
+| [D2_Operational_Runbook](../deliverables/D2_Operational_Runbook.md) | Deliverable 2: Operational Runbook | [.md](../deliverables/D2_Operational_Runbook.md) / [.docx](../deliverables/docx/D2_Operational_Runbook.docx) |
+| [D3_Final_Presentation](../deliverables/D3_Final_Presentation.md) | Deliverable 3: Final Presentation | [.md](../deliverables/D3_Final_Presentation.md) / [.docx](../deliverables/docx/D3_Final_Presentation.docx) |
+| [D3_Engineering_Playbook](../deliverables/D3_Engineering_Playbook.md) | Deliverable 3: Engineering Playbook | [.md](../deliverables/D3_Engineering_Playbook.md) / [.docx](../deliverables/docx/D3_Engineering_Playbook.docx) |
+
+To regenerate DOCX files: `python3 scripts/generate_deliverables_docx.py`
+
+---
+
+_Last Updated: February 10, 2026_

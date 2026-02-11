@@ -155,11 +155,13 @@ kubectl get job ttg-computation                                # Job status
 | Category | Key Documents |
 |----------|---------------|
 | **Quick Start** | [SUPERVISOR_REPORT.md](SUPERVISOR_REPORT.md) - Executive summary |
+| **Project Guide** | [Project Explained](docs/knowledge/PROJECT_EXPLAINED.md) - Full project explanation |
 | **Guides** | [Queue Mode Guide](docs/guides/QUEUE_MODE_GUIDE.md) ・ [Configuration](docs/guides/CONFIGURATION_GUIDE.md) |
 | **Results** | [M3 RabbitMQ + Monitoring](docs/results/TEST_RESULTS_M3_RABBITMQ_MONITORING.md) ・ [M2 Fault Tolerance](docs/results/TEST_RESULTS_M2_FAULT_TOLERANCE.md) ・ [M1 Parallel Jobs](docs/results/TEST_RESULTS_M1_PARALLEL_JOBS.md) |
 | **Setup** | [Local K8s](docs/setup/KUBERNETES_SETUP.md) ・ [Azure AKS](docs/setup/AZURE_AKS_GUIDE.md) |
 | **Knowledge** | [Kubernetes Explained](docs/knowledge/KUBERNETES_EXPLAINED.md) ・ [Kind Tutorial](docs/knowledge/KIND_EXPLAINED.md) |
 | **Tracking** | [Project Tracker](docs/tracking/PROJECT_TRACKER.md) ・ [Overview](docs/tracking/PROJECT_OVERVIEW.md) |
+| **AME-UP Deliverables** | [Deliverables Folder](deliverables/) - Performance Report, Technical Artifacts, Presentation, Playbook |
 
 ---
 
@@ -206,6 +208,14 @@ TTG/
 │   ├── results/                  # Test results
 │   ├── setup/                    # Installation guides
 │   └── tracking/                 # Project tracking
+│
+├── deliverables/                 # AME-UP final submission
+│   ├── D1_Optimization_Performance_Report.md
+│   ├── D2_Technical_Artifacts_Index.md
+│   ├── D2_Operational_Runbook.md
+│   ├── D3_Final_Presentation.md
+│   ├── D3_Engineering_Playbook.md
+│   └── docx/                    # Word document versions
 │
 ├── SUPERVISOR_REPORT.md          # Executive summary
 ├── requirements.txt              # Python dependencies
@@ -394,4 +404,4 @@ MIT License - See LICENSE file for details.
 
 ---
 
-_Last Updated: 2026-02-09 | Version: 1.3.0 | Milestone 3: ✅ Complete_
+_Last Updated: 2026-02-10 | Version: 1.3.0 | Milestone 3: ✅ Complete | AME-UP Deliverables: ✅ Ready_
