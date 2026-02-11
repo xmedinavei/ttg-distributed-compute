@@ -68,13 +68,26 @@ And a summary at the end:
 Open a **second terminal** while the demo runs:
 
 ```bash
-# RabbitMQ: CLI queue snapshot (refreshes every 2 seconds)
-./scripts/rabbitmq_monitor.sh --watch 2
+# RabbitMQ: Full dashboard (auto-refreshes every 2s by default)
+./scripts/rabbitmq_monitor.sh --watch
+
+# RabbitMQ: Custom refresh interval (every 5s)
+./scripts/rabbitmq_monitor.sh --watch 5
+
+# RabbitMQ: Single snapshot (no auto-refresh)
+./scripts/rabbitmq_monitor.sh
 
 # Redis: CLI dashboard (real-time)
 kubectl port-forward pod/ttg-redis 6379:6379 &
 python3 scripts/queue_monitor.py
 ```
+
+The RabbitMQ monitor shows:
+
+- **Queue Status** -- message counts, consumer counts, ready/unacked per queue (only `ttg.*` queues)
+- **Progress Bar** -- visual completion percentage (results vs total chunks)
+- **Worker Status** -- each `ttg-worker-*` pod with its phase (Running/Completed/Error) and node
+- **Latest Worker Output** -- last progress/completed line from each worker's logs
 
 ### Web UI Monitoring (Optional)
 
