@@ -374,4 +374,4 @@ fi
 
 echo ""
 echo "Demo finished."
-echo "Docs: docs/guides/QUEUE_MODE_GUIDE.md"
+echo "Docs: docs/guides/DEMO_GUIDE.md"

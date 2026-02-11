@@ -260,10 +260,21 @@ python3 scripts/aggregate_results.py
 
 ---
 
-## 6. Troubleshooting
+## 6. First-Time Setup
+
+If scripts fail with "Permission denied", make them executable:
+
+```bash
+chmod +x scripts/*.sh scripts/*.py k8s/local/*.sh k8s/azure/*.sh
+```
+
+---
+
+## 7. Troubleshooting
 
 | Problem | Solution |
 |---------|----------|
+| "Permission denied" on scripts | Run `chmod +x scripts/*.sh scripts/*.py` |
 | "Kind cluster not accessible" | Run `./scripts/recover-infra.sh` |
 | "Image not found" | Run `./scripts/build.sh --version 1.3.0 --load-kind` |
 | Demo hangs at 0% | Check Redis/RabbitMQ pod: `kubectl get pods` |
