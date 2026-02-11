@@ -43,6 +43,7 @@ _Operational guides for using the system day-to-day._
 
 | Document                                                | Description                                                          |
 | ------------------------------------------------------- | -------------------------------------------------------------------- |
+| [DEMO_GUIDE.md](guides/DEMO_GUIDE.md)                   | **Quick reference** for running demos and inspecting results         |
 | [CONFIGURATION_GUIDE.md](guides/CONFIGURATION_GUIDE.md) | Environment variables, configuration options, tuning parameters      |
 | [QUEUE_MODE_GUIDE.md](guides/QUEUE_MODE_GUIDE.md)       | Complete guide to queue mode operations, monitoring, troubleshooting |
 
@@ -128,6 +129,7 @@ docs/
 │   └── M2_QUEUE_ARCHITECTURE.md
 │
 ├── guides/                                # 📖 Operational Guides
+│   ├── DEMO_GUIDE.md
 │   ├── CONFIGURATION_GUIDE.md
 │   └── QUEUE_MODE_GUIDE.md
 │

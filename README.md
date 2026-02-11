@@ -156,6 +156,7 @@ kubectl get job ttg-computation                                # Job status
 |----------|---------------|
 | **Quick Start** | [SUPERVISOR_REPORT.md](SUPERVISOR_REPORT.md) - Executive summary |
 | **Project Guide** | [Project Explained](docs/knowledge/PROJECT_EXPLAINED.md) - Full project explanation |
+| **Demo Guide** | [Demo Guide](docs/guides/DEMO_GUIDE.md) - How to run demos and see results |
 | **Guides** | [Queue Mode Guide](docs/guides/QUEUE_MODE_GUIDE.md) ・ [Configuration](docs/guides/CONFIGURATION_GUIDE.md) |
 | **Results** | [M3 RabbitMQ + Monitoring](docs/results/TEST_RESULTS_M3_RABBITMQ_MONITORING.md) ・ [M2 Fault Tolerance](docs/results/TEST_RESULTS_M2_FAULT_TOLERANCE.md) ・ [M1 Parallel Jobs](docs/results/TEST_RESULTS_M1_PARALLEL_JOBS.md) |
 | **Setup** | [Local K8s](docs/setup/KUBERNETES_SETUP.md) ・ [Azure AKS](docs/setup/AZURE_AKS_GUIDE.md) |
