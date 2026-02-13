@@ -298,15 +298,14 @@ Our RabbitMQ topology uses 4 queues:
 | `knowledge/` | Tutorial-style explanations (`KUBERNETES_EXPLAINED.md`, `KIND_EXPLAINED.md`, and this file `PROJECT_EXPLAINED.md`) |
 | `results/` | Test results for each milestone (`TEST_RESULTS_M1_PARALLEL_JOBS.md`, `TEST_RESULTS_M2_FAULT_TOLERANCE.md`, `TEST_RESULTS_M3_RABBITMQ_MONITORING.md`) |
 | `setup/` | Installation and setup guides (`KUBERNETES_SETUP.md` -- local K8s setup; `AZURE_AKS_GUIDE.md` -- Azure AKS deployment) |
-| `tracking/` | Project management (`PROJECT_OVERVIEW.md`, `PROJECT_TRACKER.md`, `PROJECT_STATUS_REPORT.md`, supervisor reports, PM reports) |
+| `tracking/` | Project management (`PROJECT_OVERVIEW.md`, `PROJECT_TRACKER.md`, `PROJECT_STATUS_REPORT.md`, `SUPERVISOR_REPORT_M3_RABBITMQ.md`) |
 
 ### Root Files
 
 | File | What It Does |
 |------|-------------|
 | `README.md` | Main project README with quick start, configuration reference, troubleshooting. |
-| `SUPERVISOR_REPORT.md` | Executive summary for supervisor (M1+M2). |
-| `SUPERVISOR_REPORT_M2.md` | Detailed Milestone 2 report with demo commands. |
+| `SUPERVISOR_REPORT.md` | Executive summary for supervisor (M1+M2+M3). For M3 RabbitMQ details, see `docs/tracking/SUPERVISOR_REPORT_M3_RABBITMQ.md`. |
 | `requirements.txt` | Python dependencies: `redis>=4.5.0`, `pika>=1.3.0`. |
 | `LICENSE` | MIT License. |
 | `.gitignore` | Git ignore rules (excludes `.env`, secrets, `__pycache__`, etc.). |

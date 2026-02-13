@@ -247,8 +247,7 @@ docs/
 | Document                                                 | Description                           |
 | -------------------------------------------------------- | ------------------------------------- |
 | [SUPERVISOR_REPORT.md](../../SUPERVISOR_REPORT.md)       | Executive summary                     |
-| [SUPERVISOR_REPORT_M2.md](../../SUPERVISOR_REPORT_M2.md) | Detailed M2 report with demo commands |
-| [QUEUE_MODE_GUIDE.md](../guides/QUEUE_MODE_GUIDE.md)     | Queue mode operations guide           |
+| [QUEUE_MODE_GUIDE.md](../guides/QUEUE_MODE_GUIDE.md)     | Queue mode operations, M2 architecture, demo commands |
 
 ---
 

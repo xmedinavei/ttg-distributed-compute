@@ -8,9 +8,10 @@
 
 | Document                                              | Description                                                                             |
 | ----------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| [SUPERVISOR_REPORT.md](../SUPERVISOR_REPORT.md)       | Executive summary - quick start guide                                                   |
-| [SUPERVISOR_REPORT_M2.md](../SUPERVISOR_REPORT_M2.md) | **Milestone 2 detailed report** - architecture diagrams, demo commands, troubleshooting |
+| [SUPERVISOR_REPORT.md](../SUPERVISOR_REPORT.md)       | Executive summary - quick start, fault tolerance demo                                   |
 | [README.md](../README.md)                             | Main project README                                                                     |
+
+_For Milestone 2 architecture and demo details, see [QUEUE_MODE_GUIDE](guides/QUEUE_MODE_GUIDE.md) and [DEMO_GUIDE](guides/DEMO_GUIDE.md). For M3 RabbitMQ, see [SUPERVISOR_REPORT_M3_RABBITMQ](tracking/SUPERVISOR_REPORT_M3_RABBITMQ.md)._
 
 ---
 
@@ -90,7 +91,7 @@ _Project management, milestones, and status tracking._
 
 | Document                                                      | Description                                                                                                            |
 | ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| [PROJECT_STATUS_REPORT.md](tracking/PROJECT_STATUS_REPORT.md) | **Project Manager report** (historical M1+M2 baseline) - also available as [.docx](tracking/TTG_Project_Status_Report_M1_M2.docx) |
+| [PROJECT_STATUS_REPORT.md](tracking/PROJECT_STATUS_REPORT.md) | **Project Manager report** (historical M1+M2 baseline) - see [SUPERVISOR_REPORT_M3](tracking/SUPERVISOR_REPORT_M3_RABBITMQ.md) for current M3 status |
 | [PROJECT_OVERVIEW.md](tracking/PROJECT_OVERVIEW.md)           | High-level project overview, goals, and context                                                                        |
 | [PROJECT_TRACKER.md](tracking/PROJECT_TRACKER.md)             | Milestone tracking, sprint status, deliverables                                                                        |
 | [SUPERVISOR_REPORT_M3_RABBITMQ.md](tracking/SUPERVISOR_REPORT_M3_RABBITMQ.md) | **Milestone 3 supervisor report** (RabbitMQ + medium-scale comparison) - also available as [.docx](tracking/TTG_Project_Status_Report_M1_M2_M3.docx) |
@@ -150,7 +151,9 @@ docs/
 └── tracking/                              # 📈 Project Status
     ├── PROJECT_OVERVIEW.md
     ├── PROJECT_TRACKER.md
+    ├── PROJECT_STATUS_REPORT.md
     ├── SUPERVISOR_REPORT_M3_RABBITMQ.md
+    ├── DOCUMENTATION_CLEANUP_ANALYSIS.md   # Duplication analysis & cleanup log
     └── TTG_Project_Status_Report_M1_M2_M3.docx
 ```
 

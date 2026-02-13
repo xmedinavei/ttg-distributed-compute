@@ -244,17 +244,15 @@ This document provides a complete inventory of all technical artifacts, configur
 
 | File | Content |
 |------|---------|
-| `SUPERVISOR_REPORT.md` | Executive summary (M1+M2) with demo commands |
-| `SUPERVISOR_REPORT_M2.md` | Detailed M2 report with architecture diagrams and technical details |
+| `SUPERVISOR_REPORT.md` | Executive summary (M1+M2+M3) with quick demo |
 | `docs/tracking/SUPERVISOR_REPORT_M3_RABBITMQ.md` | M3 report with backend comparison and demo instructions |
+| `docs/guides/QUEUE_MODE_GUIDE.md` | M2 architecture, config, troubleshooting (replaces former M2 detailed report) |
 
 ### Generated Reports (Word)
 
 | File | Content |
 |------|---------|
 | `docs/tracking/TTG_Project_Status_Report_M1_M2_M3.docx` | Formal status report (planning, milestones, metrics, test results) |
-| `docs/tracking/TTG_PM_Report_PARAGRAPHS.docx` | PM report (paragraph format) |
-| `docs/tracking/TTG_PM_Report_TABLES.docx` | PM report (table format) |
 
 ---
 
@@ -267,7 +265,7 @@ This document provides a complete inventory of all technical artifacts, configur
 | Operational scripts | 10 | Build, deploy, demo, cleanup, monitoring, recovery |
 | Configuration files | 4 | `kind-config.yaml`, `Dockerfile`, `.gitignore`, `.dockerignore` |
 | Documentation files | 21+ | Architecture, guides, results, setup, tracking, knowledge |
-| Generated reports | 3 | `.docx` files in `docs/tracking/` |
+| Generated reports | 1 | `TTG_Project_Status_Report_M1_M2_M3.docx` in `docs/tracking/` |
 
 ---
 
